@@ -1,0 +1,103 @@
+{
+  "splash": {
+    "getStarted": "ابدأ الآن"
+  },
+  "welcome": {
+    "title": "جراند سنترال",
+    "subtitle": "مخبز ومطبخ",
+    "description": "خبز طازج ومعجنات ووجبات مطبخ شهية مصنوعة بحب كل يوم.",
+    "login": "تسجيل الدخول",
+    "register": "إنشاء حساب"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "language": "اللغة",
+    "selectLanguage": "اختر اللغة",
+    "english": "English",
+    "arabic": "العربية",
+    "appLanguage": "لغة التطبيق",
+    "savedAddress": "العناوين المحفوظة",
+    "savedValue": "2 محفوظة",
+    "notifications": "الإشعارات",
+    "darkTheme": "الوضع الداكن",
+    "country": "الدولة",
+    "countryValue": "قطر"
+  },
+  "register": {
+    "title": "إنشاء حساب",
+    "enterDetails": "أدخل تفاصيلك.",
+    "name": "الاسم",
+    "namePlaceholder": "الاسم",
+    "phone": "رقم الهاتف",
+    "phonePlaceholder": "رقم الهاتف",
+    "gender": "الجنس",
+    "dob": "تاريخ الميلاد",
+    "dobPlaceholder": "تاريخ الميلاد",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "البريد الإلكتروني",
+    "qid": "رقم الهوية",
+    "qidPlaceholder": "رقم الهوية",
+    "password": "كلمة المرور",
+    "passwordPlaceholder": "••••••••",
+    "next": "التالي",
+    "male": "ذكر",
+    "female": "أنثى",
+    "other": "آخر"
+  },
+  "login": {
+    "title": "تسجيل الدخول",
+    "enterDetails": "أدخل تفاصيل تسجيل الدخول.",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "بريد",
+    "or": "أو",
+    "phone": "رقم الهاتف",
+    "phonePlaceholder": "رقم الهاتف",
+    "password": "كلمة المرور",
+    "passwordPlaceholder": "********",
+    "continue": "متابعة"
+  },
+  "otp": {
+    "title": "رمز التحقق",
+    "enterCode": "أدخل رمز التحقق.",
+    "otp": "رمز التحقق",
+    "continue": "متابعة"
+  },
+  "home": {
+    "mealTitle": "وجبتك القادمة\nتبدأ من هنا.",
+    "searchPlaceholder": "ماذا تبحث عنه....",
+    "preBook": "احجز طعامك المفضل",
+    "whatYouFeelLikeOrdering": "ماذا تشعر بتناوله",
+    "breakfast": "الإفطار",
+    "burgers": "البرجر",
+    "pizza": "البيتزا",
+    "fastFood": "الوجبات السريعة",
+    "orderNow": "اطلب الآن",
+    "homeTab": "الرئيسية",
+    "ordersTab": "الطلبات",
+    "accountTab": "الحساب"
+  },
+  "account": {
+    "accountInfo": "معلومات الحساب",
+    "loyaltyPoints": "نقاط الولاء",
+    "points": "نقاط",
+    "coupon": "كوبون",
+    "available": "متاح",
+    "orderHistory": "سجل الطلبات",
+    "settings": "الإعدادات",
+    "about": "حول",
+    "help": "مساعدة",
+    "logout": "تسجيل خروج"
+  },
+  "accountInfo": {
+    "title": "معلومات الحساب",
+    "name": "الاسم",
+    "namePlaceholder": "الاسم",
+    "phone": "رقم الهاتف",
+    "phonePlaceholder": "رقم الهاتف",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "بريد",
+    "gender": "الجنس",
+    "dob": "تاريخ الميلاد",
+    "dobPlaceholder": "تاريخ الميلاد"
+  }
+}

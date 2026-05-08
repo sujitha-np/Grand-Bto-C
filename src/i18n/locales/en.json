@@ -1,0 +1,103 @@
+{
+  "splash": {
+    "getStarted": "Get Started"
+  },
+  "welcome": {
+    "title": "Grand Central",
+    "subtitle": "Bakery & Kitchen",
+    "description": "Freshly baked breads, pastries, and hearty kitchen meals crafted with love every single day.",
+    "login": "Login",
+    "register": "Register"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "selectLanguage": "Select Language",
+    "english": "English",
+    "arabic": "Arabic",
+    "appLanguage": "App Language",
+    "savedAddress": "Saved Address",
+    "savedValue": "2 Saved",
+    "notifications": "Notifications",
+    "darkTheme": "Dark Theme",
+    "country": "Country",
+    "countryValue": "Qatar"
+  },
+  "register": {
+    "title": "Register",
+    "enterDetails": "Enter your details.",
+    "name": "Name",
+    "namePlaceholder": "Name",
+    "phone": "Phone Number",
+    "phonePlaceholder": "Phone Number",
+    "gender": "Gender",
+    "dob": "DOB",
+    "dobPlaceholder": "DOB",
+    "email": "Email",
+    "emailPlaceholder": "Email",
+    "qid": "QID",
+    "qidPlaceholder": "QID Number",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "next": "Next",
+    "male": "Male",
+    "female": "Female",
+    "other": "Other"
+  },
+  "login": {
+    "title": "Login",
+    "enterDetails": "Enter your login details.",
+    "email": "Email",
+    "emailPlaceholder": "Mail",
+    "or": "Or",
+    "phone": "Phone Number",
+    "phonePlaceholder": "Phone Number",
+    "password": "Password",
+    "passwordPlaceholder": "********",
+    "continue": "Continue"
+  },
+  "otp": {
+    "title": "OTP",
+    "enterCode": "Enter the verification code.",
+    "otp": "OTP",
+    "continue": "Continue"
+  },
+  "home": {
+    "mealTitle": "Your next great\nmeal starts here.",
+    "searchPlaceholder": "What are looking for....",
+    "preBook": "Pre book your favorite food",
+    "whatYouFeelLikeOrdering": "What do you feel like ordering?",
+    "breakfast": "Break Fast",
+    "burgers": "Burgers",
+    "pizza": "Pizza",
+    "fastFood": "Fast Food",
+    "orderNow": "Order Now",
+    "homeTab": "Home",
+    "ordersTab": "Orders",
+    "accountTab": "Account"
+  },
+  "account": {
+    "accountInfo": "Account Info",
+    "loyaltyPoints": "Loyalty Points",
+    "points": "Points",
+    "coupon": "Coupon",
+    "available": "Available",
+    "orderHistory": "Order History",
+    "settings": "Settings",
+    "about": "About",
+    "help": "Help",
+    "logout": "Log out"
+  },
+  "accountInfo": {
+    "title": "Account Info",
+    "name": "Name",
+    "namePlaceholder": "Name",
+    "phone": "Phone Number",
+    "phonePlaceholder": "Phone Number",
+    "email": "Email",
+    "emailPlaceholder": "mail",
+    "gender": "Gender",
+    "dob": "DOB",
+    "dobPlaceholder": "DOB"
+  }
+}
