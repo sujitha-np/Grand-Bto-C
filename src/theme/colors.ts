@@ -25,6 +25,12 @@ export interface AppColors {
   fontRegular: string;
   fontInterMedium: string;
   fontInterSemiBold: string;
+  fontInterRegular: string;
+  darkBrown: string;
+  lightBrown: string;
+  lightGray: string;
+  offWhite: string;
+  placeholderGray: string;
 }
 
 export const lightColors: AppColors = {
@@ -52,6 +58,12 @@ export const lightColors: AppColors = {
   fontRegular: 'Manrope-Regular',
   fontInterMedium: 'Inter-Medium',
   fontInterSemiBold: 'Inter-SemiBold',
+  fontInterRegular: 'Inter-Regular',
+  darkBrown: '#3B2B20',
+  lightBrown: '#B88A52',
+  lightGray: '#252525',
+  offWhite: '#F7F5F1',
+  placeholderGray: '#252525',
 };
 
 export const darkColors: AppColors = {
@@ -79,4 +91,10 @@ export const darkColors: AppColors = {
   fontRegular: 'Manrope-Regular',
   fontInterMedium: 'Inter-Medium',
   fontInterSemiBold: 'Inter-SemiBold',
+  fontInterRegular: 'Inter-Regular',
+  darkBrown: '#3B2B20',
+  lightBrown: '#B88A52',
+  lightGray: '#252525',
+  offWhite: '#F7F5F1',
+  placeholderGray: '#252525',
 };

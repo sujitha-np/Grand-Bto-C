@@ -27,8 +27,23 @@ import HomeScreen from './src/screens/HomeScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import AccountInfoScreen from './src/screens/AccountInfoScreen';
+import FeedbackScreen from './src/screens/FeedbackScreen';
+import OrderHistoryScreen from './src/screens/OrderHistoryScreen';
+import LoyaltyPointsScreen from './src/screens/LoyaltyPointsScreen';
 import CartScreen from './src/screens/CartScreen';
+import CalendarScreen from './src/screens/CalendarScreen';
+import SavedAddressScreen from './src/screens/SavedAddressScreen';
+import NewAddressScreen from './src/screens/NewAddressScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
+import ProductDetailScreen from './src/screens/ProductDetailScreen';
+import OfferedProductsScreen from './src/screens/OfferedProductsScreen';
+import WishlistScreen from './src/screens/WishlistScreen';
+import CouponScreen from './src/screens/CouponScreen';
+import PromoCodesScreen from './src/screens/PromoCodesScreen';
+import { SavedAddress } from './src/services/api/address';
+import { Product } from './src/services/api/product';
 import { useTheme } from './src/hooks/useTheme';
+import { useAddToCart } from './src/hooks/queries';
 import { fs, sw, sh } from './src/utils/responsive';
 import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -37,7 +52,9 @@ const toastConfig = {
   success: (props: any) => (
     <BaseToast
       {...props}
-      text1Style={{ fontSize: 16 }}
+      style={{ borderLeftColor: '#FF7B00' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{ fontSize: 16, fontWeight: '600' }}
       text2Style={{ fontSize: 14 }}
       text2NumberOfLines={0}
     />
@@ -45,7 +62,9 @@ const toastConfig = {
   error: (props: any) => (
     <ErrorToast
       {...props}
-      text1Style={{ fontSize: 16 }}
+      style={{ borderLeftColor: '#FF0000' }}
+      contentContainerStyle={{ paddingHorizontal: 15 }}
+      text1Style={{ fontSize: 16, fontWeight: '600' }}
       text2Style={{ fontSize: 14 }}
       text2NumberOfLines={0}
     />
@@ -170,29 +189,252 @@ type Tab = 'home' | 'orders' | 'account';
 function MainApp({ onLogout }: { onLogout: () => void }) {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [subScreen, setSubScreen] = useState<string | null>(null);
+  const [cartTotal, setCartTotal] = useState<number>(0);
+  const [selectedDeliveryDate, setSelectedDeliveryDate] = useState<string>('');
+  const [editAddress, setEditAddress] = useState<SavedAddress | undefined>();
+  const [selectedAddress, setSelectedAddress] = useState<
+    SavedAddress | undefined
+  >();
+  const [cartIdForCheckout, setCartIdForCheckout] = useState<string>('');
+  const [selectedPromoCode, setSelectedPromoCode] = useState<string>('');
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedOffer, setSelectedOffer] = useState<{
+    offerId: number;
+    offerName: string;
+  } | null>(null);
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const colors = useTheme();
+  const { mutateAsync: addToCart } = useAddToCart();
 
   if (subScreen === 'accountInfo') {
     return <AccountInfoScreen onBack={() => setSubScreen(null)} />;
   }
 
+  if (subScreen === 'settings') {
+    return <SettingsScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  if (subScreen === 'feedback') {
+    return <FeedbackScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  if (subScreen === 'orderHistory') {
+    return <OrderHistoryScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  if (subScreen === 'loyaltyPoints') {
+    console.log('Rendering LoyaltyPointsScreen');
+    return <LoyaltyPointsScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  if (subScreen === 'offeredProducts' && selectedOffer) {
+    return (
+      <OfferedProductsScreen
+        offerId={selectedOffer.offerId}
+        offerName={selectedOffer.offerName}
+        onBack={() => {
+          setSelectedOffer(null);
+          setSubScreen(null);
+        }}
+        onShowProductDetail={product => {
+          setSelectedProduct(product);
+          setSubScreen('productDetail');
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'wishlist') {
+    return (
+      <WishlistScreen
+        onBack={() => setSubScreen(null)}
+        onShowProductDetail={productId => {
+          // We need to fetch the product, but for now we can navigate with just the ID
+          // You might need to create a product object or modify ProductDetailScreen
+          setSubScreen(null);
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'coupons') {
+    const couponsBackScreen = selectedAddress ? 'checkout' : null;
+    return <CouponScreen onBack={() => setSubScreen(couponsBackScreen)} />;
+  }
+
+  if (subScreen === 'promoCodes') {
+    return (
+      <PromoCodesScreen
+        onBack={() => setSubScreen('checkout')}
+        onSelectPromo={code => {
+          setSelectedPromoCode(code);
+          setSubScreen('checkout');
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'productDetail' && selectedProduct) {
+    return (
+      <ProductDetailScreen
+        product={selectedProduct as any}
+        onBack={() => {
+          setSelectedProduct(null);
+          setSubScreen(null);
+        }}
+        onAddToCart={async (productId, quantity) => {
+          const customerId = await AsyncStorage.getItem('customerId');
+          if (customerId) {
+            const today = new Date().toISOString().split('T')[0];
+            try {
+              await addToCart({
+                customerId,
+                productId: productId.toString(),
+                quantity: quantity.toString(),
+                preorderDate: today,
+              });
+              Toast.show({
+                type: 'success',
+                text1: 'Added to Cart',
+                text2: `${quantity}x ${selectedProduct.name_en}`,
+              });
+              setSelectedProduct(null);
+              setSubScreen('cart');
+            } catch (err: any) {
+              Toast.show({
+                type: 'error',
+                text1: 'Failed to add to cart',
+                text2: err?.message || 'Unknown error',
+              });
+            }
+          }
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'calendar') {
+    return (
+      <CalendarScreen
+        onBack={() => setSubScreen('cart')}
+        totalAmount={cartTotal}
+        cartId={cartIdForCheckout}
+        onCheckout={selectedDate => {
+          setSelectedDeliveryDate(selectedDate);
+          setSubScreen('savedAddress');
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'savedAddress') {
+    return (
+      <SavedAddressScreen
+        onBack={() => setSubScreen('calendar')}
+        totalAmount={cartTotal}
+        selectedDate={selectedDeliveryDate}
+        onAddNew={() => {
+          setEditAddress(undefined);
+          setSubScreen('newAddress');
+        }}
+        onEditAddress={address => {
+          setEditAddress(address);
+          setSubScreen('newAddress');
+        }}
+        onProceedToCheckout={address => {
+          setSelectedAddress(address);
+          setSubScreen('checkout');
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'newAddress') {
+    return (
+      <NewAddressScreen
+        onBack={() => {
+          setEditAddress(undefined);
+          setSubScreen('savedAddress');
+        }}
+        editAddress={editAddress}
+        onAddNew={() => {
+          setEditAddress(undefined);
+        }}
+        onSave={addressData => {
+          console.log('Address saved:', addressData);
+          setEditAddress(undefined);
+          setSubScreen('savedAddress');
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'checkout') {
+    if (!selectedAddress) {
+      setSubScreen('savedAddress');
+      return null;
+    }
+
+    return (
+      <CheckoutScreen
+        onBack={() => setSubScreen('savedAddress')}
+        selectedAddress={selectedAddress}
+        cartId={cartIdForCheckout}
+        preorderDate={selectedDeliveryDate}
+        onViewAllPromos={() => setSubScreen('promoCodes')}
+        preFilledPromoCode={selectedPromoCode}
+        onOrderPlaced={() => {
+          setSubScreen(null);
+          setActiveTab('orders');
+        }}
+      />
+    );
+  }
+
   if (subScreen === 'cart') {
-    return <CartScreen onBack={() => setSubScreen(null)} />;
+    return (
+      <CartScreen
+        onBack={() => setSubScreen(null)}
+        onSelectDate={(total, cartId) => {
+          setCartTotal(total);
+          setCartIdForCheckout(cartId);
+          setSubScreen('calendar');
+        }}
+      />
+    );
   }
 
   return (
     <View style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
         {activeTab === 'home' && (
-          <HomeScreen onShowCart={() => setSubScreen('cart')} />
+          <HomeScreen
+            onShowCart={() => setSubScreen('cart')}
+            onShowProductDetail={product => {
+              setSelectedProduct(product);
+              setSubScreen('productDetail');
+            }}
+            onShowOfferedProducts={(offerId, offerName) => {
+              setSelectedOffer({ offerId, offerName });
+              setSubScreen('offeredProducts');
+            }}
+            onShowWishlist={() => setSubScreen('wishlist')}
+          />
         )}
         {activeTab === 'orders' && <OrdersScreen />}
         {activeTab === 'account' && (
           <AccountScreen
             onLogout={onLogout}
             onAccountInfo={() => setSubScreen('accountInfo')}
+            onSettings={() => setSubScreen('settings')}
+            onFeedback={() => setSubScreen('feedback')}
+            onOrderHistory={() => setSubScreen('orderHistory')}
+            onLoyaltyPoints={() => {
+              console.log('onLoyaltyPoints called in App.tsx');
+              setSubScreen('loyaltyPoints');
+            }}
+            onCoupons={() => setSubScreen('coupons')}
           />
         )}
       </View>

@@ -19,6 +19,7 @@ import InputField from '../components/common/InputField';
 import { authService } from '../services/api/auth';
 import { Images } from '../assets/images';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface RegisterScreenProps {
   onBack: () => void;
@@ -104,6 +105,18 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
         password,
       });
 
+      // Store user data locally
+      await AsyncStorage.setItem(
+        'userData',
+        JSON.stringify({
+          name,
+          phone,
+          email,
+          gender,
+          dob,
+        }),
+      );
+
       Toast.show({
         type: 'success',
         text1: 'Success',
@@ -134,7 +147,7 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView
@@ -157,6 +170,7 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
           />
 
           <InputField
+            maxLength={8}
             label={t('register.phone')}
             placeholder={t('register.phonePlaceholder')}
             value={phone}
@@ -296,7 +310,7 @@ const createStyles = (colors: any, insets: any) =>
     scrollContent: {
       paddingHorizontal: sw(20),
       paddingTop: sh(4),
-      paddingBottom: sh(16),
+      paddingBottom: sh(40),
     },
     pageTitle: {
       fontSize: fs(32),

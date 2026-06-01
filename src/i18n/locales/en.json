@@ -99,5 +99,93 @@
     "gender": "Gender",
     "dob": "DOB",
     "dobPlaceholder": "DOB"
+  },
+  "address": {
+    "title": "Saved Address",
+    "add": "Add+",
+    "empty": "No saved addresses found.",
+    "phone": "Phone Number",
+    "deliveryDate": "Delivery date",
+    "total": "Total amount",
+    "retry": "Retry",
+    "default": "Default",
+    "setDefault": "Set Default"
+  },
+  "newAddress": {
+    "title": "New Address",
+    "editTitle": "Edit Address",
+    "house": "House",
+    "apartment": "Apartment",
+    "office": "Office",
+    "label": "Label",
+    "labelPlaceholder": "Label",
+    "name": "Name",
+    "namePlaceholder": "Name",
+    "buildingName": "Building Name",
+    "buildingNamePlaceholder": "Building Name",
+    "aptNumber": "Apt. number",
+    "aptNumberPlaceholder": "Apt. number",
+    "floor": "Floor",
+    "floorPlaceholder": "Floor",
+    "street": "Street",
+    "streetPlaceholder": "Street Name",
+    "zone": "Zone",
+    "zonePlaceholder": "Zone",
+    "phoneNumber": "Phone Number",
+    "phoneNumberPlaceholder": "Phone Number",
+    "additionalDirections": "Additional Directions",
+    "additionalDirectionsPlaceholder": "Additional Directions",
+    "save": "Save",
+    "submit": "Submit",
+    "required": "This field is required"
+  },
+  "savedAddress": {
+    "title": "Saved Address",
+    "noAddresses": "No saved addresses found.",
+    "addNewAddress": "Add New Address",
+    "proceed": "Proceed to Checkout"
+  },
+  "checkout": {
+    "title": "Checkout",
+    "deliveryAddress": "Delivery Address",
+    "orderSummary": "Order Summary",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "paymentMethod": "Payment Method",
+    "cashOnDelivery": "Cash on Delivery",
+    "payOnline": "Pay Online",
+    "useWallet": "Use Wallet Balance",
+    "placeOrder": "Place Order"
+  },
+  "feedback": {
+    "title": "Feedback",
+    "questionTitle": "How would you rate your\nexperience?",
+    "veryGood": "Very Good",
+    "whatDoYouThink": "What do you think?",
+    "greatQuality": "Great Quality",
+    "lovePackaging": "Love the packaging",
+    "arrivedOnTime": "Arrived on time",
+    "minorIssue": "Minor issue, but still happy",
+    "wouldOrderAgain": "Would order again",
+    "tellUsAbout": "Would you tell us about your experience.",
+    "placeholder": "Enter your feedback here",
+    "submit": "Submit"
+  },
+  "orderHistory": {
+    "title": "Order History",
+    "allOrders": "All Order",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "total": "Total",
+    "currency": "QAR",
+    "noOrders": "No orders found"
+  },
+  "loyaltyPoints": {
+    "title": "Loyalty Points",
+    "points": "Points",
+    "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod.",
+    "pointHistory": "Point History",
+    "seeAll": "See all",
+    "noHistory": "No points history available"
   }
 }

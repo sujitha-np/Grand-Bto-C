@@ -84,6 +84,10 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
     signingConfigs {
         debug {
@@ -103,7 +107,17 @@ android {
             signingConfig signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+            
+            // Speed up release builds
+            shrinkResources false
+            crunchPngs false
         }
+    }
+    
+    // Packaging options to reduce build time
+    packagingOptions {
+        pickFirst '**/*.so'
+        pickFirst '**/libc++_shared.so'
     }
 }
 

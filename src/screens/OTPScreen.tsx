@@ -105,12 +105,21 @@ function OTPScreen({ onBack, onContinue, customerId }: OTPScreenProps) {
     setLoading(true);
     try {
       const resp = await authService.verifyOtp(customerId, code);
+      console.log('OTP Verification Response:', resp);
       await AsyncStorage.setItem('customerId', String(customerId));
 
       // Try to save token from response (might be at resp.token, resp.data.token, etc.)
-      const token = resp?.token || resp?.data?.token;
+      const token =
+        resp?.token ||
+        resp?.data?.token ||
+        resp?.access_token ||
+        resp?.data?.access_token;
+      console.log('Token found:', token ? 'YES' : 'NO');
       if (token) {
         await AsyncStorage.setItem('userToken', token);
+        console.log('Token saved to AsyncStorage');
+      } else {
+        console.warn('No token found in OTP response', resp);
       }
 
       Toast.show({

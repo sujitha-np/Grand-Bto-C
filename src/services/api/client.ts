@@ -4,20 +4,27 @@ import { BASE_URL } from '../../constants/api';
 
 const apiClient = axios.create({
   baseURL: `${BASE_URL}/api`,
-  timeout: 30000,
+  timeout: 60000,
 });
 
 apiClient.interceptors.request.use(async config => {
   try {
     const token = await AsyncStorage.getItem('userToken');
+    console.log(
+      'Interceptor - Token retrieved:',
+      token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
+    );
+    console.log('Interceptor - Request URL:', config.url);
     if (token) {
-      if (typeof config.headers.set === 'function') {
+      if (config.headers && typeof config.headers.set === 'function') {
         config.headers.set('Authorization', `Bearer ${token}`);
-      } else {
-        (config.headers as any).Authorization = `Bearer ${token}`;
+      } else if (config.headers) {
+        config.headers['Authorization'] = `Bearer ${token}`;
       }
+      console.log('Interceptor - Authorization header set');
     }
   } catch (error) {
+    console.log('Interceptor - Error getting token:', error);
     // Ignore storage errors
   }
   return config;

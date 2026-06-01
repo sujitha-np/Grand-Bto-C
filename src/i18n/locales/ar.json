@@ -99,5 +99,93 @@
     "gender": "الجنس",
     "dob": "تاريخ الميلاد",
     "dobPlaceholder": "تاريخ الميلاد"
+  },
+  "address": {
+    "title": "العناوين المحفوظة",
+    "add": "إضافة+",
+    "empty": "لا توجد عناوين محفوظة.",
+    "phone": "رقم الهاتف",
+    "deliveryDate": "تاريخ التسليم",
+    "total": "المبلغ الإجمالي",
+    "retry": "إعادة المحاولة",
+    "default": "افتراضي",
+    "setDefault": "تعيين كافتراضي"
+  },
+  "newAddress": {
+    "title": "عنوان جديد",
+    "editTitle": "تعديل العنوان",
+    "house": "منزل",
+    "apartment": "شقة",
+    "office": "مكتب",
+    "label": "التسمية",
+    "labelPlaceholder": "التسمية",
+    "name": "الاسم",
+    "namePlaceholder": "الاسم",
+    "buildingName": "اسم المبنى",
+    "buildingNamePlaceholder": "اسم المبنى",
+    "aptNumber": "رقم الشقة",
+    "aptNumberPlaceholder": "رقم الشقة",
+    "floor": "الطابق",
+    "floorPlaceholder": "الطابق",
+    "street": "الشارع",
+    "streetPlaceholder": "اسم الشارع",
+    "zone": "المنطقة",
+    "zonePlaceholder": "المنطقة",
+    "phoneNumber": "رقم الهاتف",
+    "phoneNumberPlaceholder": "رقم الهاتف",
+    "additionalDirections": "اتجاهات إضافية",
+    "additionalDirectionsPlaceholder": "اتجاهات إضافية",
+    "save": "حفظ",
+    "submit": "إرسال",
+    "required": "هذا الحقل مطلوب"
+  },
+  "savedAddress": {
+    "title": "العناوين المحفوظة",
+    "noAddresses": "لا توجد عناوين محفوظة.",
+    "addNewAddress": "إضافة عنوان جديد",
+    "proceed": "المتابعة إلى الدفع"
+  },
+  "checkout": {
+    "title": "الدفع",
+    "deliveryAddress": "عنوان التسليم",
+    "orderSummary": "ملخص الطلب",
+    "subtotal": "المجموع الفرعي",
+    "total": "المجموع",
+    "paymentMethod": "طريقة الدفع",
+    "cashOnDelivery": "الدفع عند التسليم",
+    "payOnline": "الدفع عبر الإنترنت",
+    "useWallet": "استخدام رصيد المحفظة",
+    "placeOrder": "تأكيد الطلب"
+  },
+  "feedback": {
+    "title": "ملاحظات",
+    "questionTitle": "كيف تقيم تجربتك؟",
+    "veryGood": "جيد جداً",
+    "whatDoYouThink": "ما رأيك؟",
+    "greatQuality": "جودة رائعة",
+    "lovePackaging": "أحببت التغليف",
+    "arrivedOnTime": "وصل في الوقت المحدد",
+    "minorIssue": "مشكلة بسيطة، لكن لا يزال سعيداً",
+    "wouldOrderAgain": "سأطلب مرة أخرى",
+    "tellUsAbout": "هل تخبرنا عن تجربتك.",
+    "placeholder": "أدخل ملاحظاتك هنا",
+    "submit": "إرسال"
+  },
+  "orderHistory": {
+    "title": "سجل الطلبات",
+    "allOrders": "جميع الطلبات",
+    "completed": "مكتمل",
+    "cancelled": "ملغى",
+    "total": "المجموع",
+    "currency": "ريال",
+    "noOrders": "لا توجد طلبات"
+  },
+  "loyaltyPoints": {
+    "title": "نقاط الولاء",
+    "points": "نقاط",
+    "description": "لوريم إيبسوم دولور سيت أميت، كونسيكتيتور أديبيسينغ إيليت، سيد دو إيوسمود.",
+    "pointHistory": "سجل النقاط",
+    "seeAll": "عرض الكل",
+    "noHistory": "لا يوجد سجل نقاط متاح"
   }
 }

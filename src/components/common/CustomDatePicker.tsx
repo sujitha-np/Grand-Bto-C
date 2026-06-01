@@ -7,28 +7,63 @@ interface CustomDatePickerProps {
   visible: boolean;
   onClose: () => void;
   onSelect: (dateString: string) => void;
+  mode?: 'dob' | 'any'; // 'dob' for date of birth with 18+ restriction, 'any' for any date
+  minDate?: Date; // Optional minimum date
+  maxDate?: Date; // Optional maximum date
 }
 
 const MONTHS = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
 ];
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-export default function CustomDatePicker({ visible, onClose, onSelect }: CustomDatePickerProps) {
+export default function CustomDatePicker({
+  visible,
+  onClose,
+  onSelect,
+  mode = 'dob',
+  minDate,
+  maxDate: customMaxDate,
+}: CustomDatePickerProps) {
   const colors = useTheme();
-  
-  const today = new Date();
-  const maxDate = new Date(today.getFullYear() - 18, today.getMonth(), today.getDate());
 
-  // Default to 20 years ago for DOB, or maxDate if 20 years ago is somehow invalid
-  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear() - 20, 0, 1));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+
+  // For DOB mode, default to 18+ years restriction
+  const maxDate =
+    mode === 'dob'
+      ? new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
+      : customMaxDate || new Date(today.getFullYear() + 1, 11, 31); // Allow up to next year for orders
+
+  const minDateRestriction =
+    mode === 'dob'
+      ? new Date(today.getFullYear() - 100, 0, 1) // 100 years ago for DOB
+      : minDate || new Date(1900, 0, 1); // Allow past dates for order history when no minDate specified
+
+  // Default to 20 years ago for DOB, or today for other modes
+  const [currentDate, setCurrentDate] = useState(
+    mode === 'dob' ? new Date(today.getFullYear() - 20, 0, 1) : new Date(),
+  );
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
 
-  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-  const getFirstDayOfMonth = (y: number, m: number) => new Date(y, m, 1).getDay();
+  const getDaysInMonth = (y: number, m: number) =>
+    new Date(y, m + 1, 0).getDate();
+  const getFirstDayOfMonth = (y: number, m: number) =>
+    new Date(y, m, 1).getDay();
 
   const daysInMonth = getDaysInMonth(year, month);
   const firstDay = getFirstDayOfMonth(year, month);
@@ -49,56 +84,129 @@ export default function CustomDatePicker({ visible, onClose, onSelect }: CustomD
   };
 
   const isDayDisabled = (d: number) => {
-    return new Date(year, month, d) > maxDate;
+    const date = new Date(year, month, d);
+    date.setHours(0, 0, 0, 0);
+    return date > maxDate || date < minDateRestriction;
   };
 
-  const isNextMonthDisabled = new Date(year, month + 1, 1) > maxDate;
-  const isNextYearDisabled = new Date(year + 1, month, 1) > maxDate;
+  const isToday = (d: number) => {
+    const date = new Date(year, month, d);
+    date.setHours(0, 0, 0, 0);
+    return date.getTime() === today.getTime();
+  };
+
+  const isNextMonthDisabled = () => {
+    const nextMonthDate = new Date(year, month + 1, 1);
+    nextMonthDate.setHours(0, 0, 0, 0);
+    return nextMonthDate > maxDate;
+  };
+
+  const isNextYearDisabled = () => {
+    const nextYearDate = new Date(year + 1, month, 1);
+    nextYearDate.setHours(0, 0, 0, 0);
+    return nextYearDate > maxDate;
+  };
+
+  const isPrevMonthDisabled = () => {
+    const prevMonthLastDay = new Date(year, month, 0);
+    prevMonthLastDay.setHours(0, 0, 0, 0);
+    return prevMonthLastDay < minDateRestriction;
+  };
+
+  const isPrevYearDisabled = () => {
+    const prevYearDate = new Date(year - 1, month + 1, 0);
+    prevYearDate.setHours(0, 0, 0, 0);
+    return prevYearDate < minDateRestriction;
+  };
 
   const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
   const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
   const nextYear = () => setCurrentDate(new Date(year + 1, month, 1));
   const prevYear = () => setCurrentDate(new Date(year - 1, month, 1));
 
+  if (!visible) {
+    return null;
+  }
+
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+      statusBarTranslucent={true}
+      hardwareAccelerated={true}
+      presentationStyle="overFullScreen"
+    >
       <View style={styles.overlay}>
-        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
-        <View style={[styles.container, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.container,
+            {
+              backgroundColor: colors.card || '#FFFFFF',
+              borderColor: colors.border || '#E0E0E0',
+            },
+          ]}
+        >
           <View style={styles.header}>
-            <TouchableOpacity onPress={prevYear} style={styles.navBtn}>
-              <Text style={[styles.navText, { color: colors.textMuted }]}>{'<<'}</Text>
+            <TouchableOpacity
+              onPress={prevYear}
+              style={[styles.navBtn, isPrevYearDisabled() && { opacity: 0.3 }]}
+              disabled={isPrevYearDisabled()}
+            >
+              <Text style={[styles.navText, { color: colors.textMuted }]}>
+                {'<<'}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={prevMonth} style={styles.navBtn}>
-              <Text style={[styles.navText, { color: colors.textMuted }]}>{'<'}</Text>
+            <TouchableOpacity
+              onPress={prevMonth}
+              style={[styles.navBtn, isPrevMonthDisabled() && { opacity: 0.3 }]}
+              disabled={isPrevMonthDisabled()}
+            >
+              <Text style={[styles.navText, { color: colors.textMuted }]}>
+                {'<'}
+              </Text>
             </TouchableOpacity>
-            
+
             <View style={styles.headerTitle}>
               <Text style={[styles.titleText, { color: colors.text }]}>
                 {MONTHS[month]} {year}
               </Text>
             </View>
 
-            <TouchableOpacity 
-              onPress={nextMonth} 
-              style={[styles.navBtn, isNextMonthDisabled && { opacity: 0.3 }]}
-              disabled={isNextMonthDisabled}
+            <TouchableOpacity
+              onPress={nextMonth}
+              style={[styles.navBtn, isNextMonthDisabled() && { opacity: 0.3 }]}
+              disabled={isNextMonthDisabled()}
             >
-              <Text style={[styles.navText, { color: colors.textMuted }]}>{'>'}</Text>
+              <Text style={[styles.navText, { color: colors.textMuted }]}>
+                {'>'}
+              </Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              onPress={nextYear} 
-              style={[styles.navBtn, isNextYearDisabled && { opacity: 0.3 }]}
-              disabled={isNextYearDisabled}
+            <TouchableOpacity
+              onPress={nextYear}
+              style={[styles.navBtn, isNextYearDisabled() && { opacity: 0.3 }]}
+              disabled={isNextYearDisabled()}
             >
-              <Text style={[styles.navText, { color: colors.textMuted }]}>{'>>'}</Text>
+              <Text style={[styles.navText, { color: colors.textMuted }]}>
+                {'>>'}
+              </Text>
             </TouchableOpacity>
           </View>
 
           <View style={styles.weekDays}>
             {DAYS.map((d, i) => (
-              <Text key={i} style={[styles.weekDayText, { color: colors.textMuted }]}>{d}</Text>
+              <Text
+                key={i}
+                style={[styles.weekDayText, { color: colors.textMuted }]}
+              >
+                {d}
+              </Text>
             ))}
           </View>
 
@@ -107,11 +215,23 @@ export default function CustomDatePicker({ visible, onClose, onSelect }: CustomD
               <View key={index} style={styles.dayCell}>
                 {day !== null && (
                   <TouchableOpacity
-                    style={[styles.dayButton, isDayDisabled(day) && { opacity: 0.3 }]}
+                    style={[
+                      styles.dayButton,
+                      isToday(day) && styles.todayButton,
+                      isDayDisabled(day) && { opacity: 0.3 },
+                    ]}
                     onPress={() => handleDayPress(day)}
                     disabled={isDayDisabled(day)}
                   >
-                    <Text style={[styles.dayText, { color: colors.text }]}>{day}</Text>
+                    <Text
+                      style={[
+                        styles.dayText,
+                        { color: colors.text },
+                        isToday(day) && styles.todayText,
+                      ]}
+                    >
+                      {day}
+                    </Text>
                   </TouchableOpacity>
                 )}
               </View>
@@ -119,7 +239,9 @@ export default function CustomDatePicker({ visible, onClose, onSelect }: CustomD
           </View>
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
-            <Text style={[styles.cancelText, { color: colors.primary }]}>Cancel</Text>
+            <Text style={[styles.cancelText, { color: colors.primary }]}>
+              Cancel
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -132,10 +254,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    zIndex: 9999,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
   },
   container: {
     width: '85%',
@@ -147,6 +271,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 5,
+    zIndex: 2,
   },
   header: {
     flexDirection: 'row',
@@ -199,6 +324,13 @@ const styles = StyleSheet.create({
   dayText: {
     fontSize: fs(14),
     fontFamily: 'Inter-Regular',
+  },
+  todayButton: {
+    backgroundColor: '#FF8C42',
+  },
+  todayText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter-Bold',
   },
   cancelBtn: {
     marginTop: sh(16),

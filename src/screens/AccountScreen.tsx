@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
@@ -16,16 +17,68 @@ import { fs, sw, sh } from '../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Images } from '../assets/images';
+import {
+  useCustomerProfile,
+  useLoyaltyPoints,
+  usePromocodes,
+} from '../hooks/queries';
 
 interface AccountScreenProps {
   onLogout: () => void;
   onAccountInfo?: () => void;
+  onSettings?: () => void;
+  onFeedback?: () => void;
+  onOrderHistory?: () => void;
+  onLoyaltyPoints?: () => void;
+  onCoupons?: () => void;
 }
 
-function AccountScreen({ onLogout, onAccountInfo }: AccountScreenProps) {
+function AccountScreen({
+  onLogout,
+  onAccountInfo,
+  onSettings,
+  onFeedback,
+  onOrderHistory,
+  onLoyaltyPoints,
+  onCoupons,
+}: AccountScreenProps) {
   const { t } = useTranslation();
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  const [customerId, setCustomerId] = useState<string | undefined>();
+
+  // Fetch customer profile
+  const { data: profileData, isLoading: profileLoading } =
+    useCustomerProfile(customerId);
+  const profile = profileData?.data;
+
+  // Fetch loyalty points
+  const { data: loyaltyData } = useLoyaltyPoints(customerId);
+  const loyaltyPoints = loyaltyData?.data?.points || 0;
+
+  // Fetch promocodes
+  const { data: promocodeData } = usePromocodes();
+  const promocodes = promocodeData?.data || [];
+
+  // Count non-expired coupons
+  const availableCoupons = promocodes.filter((promo: any) => {
+    return new Date(promo.end_date) >= new Date();
+  }).length;
+
+  useEffect(() => {
+    const loadCustomerId = async () => {
+      try {
+        const storedCustomerId = await AsyncStorage.getItem('customerId');
+        if (storedCustomerId) {
+          setCustomerId(storedCustomerId);
+        }
+      } catch (error) {
+        console.error('Error loading customerId:', error);
+      }
+    };
+
+    loadCustomerId();
+  }, []);
 
   const styles = React.useMemo(
     () => createStyles(colors, insets),
@@ -38,7 +91,7 @@ function AccountScreen({ onLogout, onAccountInfo }: AccountScreenProps) {
       id: '2',
       title: t('account.loyaltyPoints'),
       icon: Images.loyality,
-      value: `0 ${t('account.points')}`,
+      value: `${loyaltyPoints} ${t('account.points')}`,
     },
     { id: '3', title: t('account.coupon'), icon: Images.coupon },
     { id: '4', title: t('account.orderHistory'), icon: Images.orderHistory },
@@ -72,9 +125,15 @@ function AccountScreen({ onLogout, onAccountInfo }: AccountScreenProps) {
                 {/* Placeholder for actual avatar */}
                 <Image source={Images.account} style={styles.avatar} />
               </View>
-              <Text style={styles.profileName}>Grace</Text>
+              {profileLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.profileName}>
+                  {profile?.name_en || 'Guest'}
+                </Text>
+              )}
             </View>
-            <TouchableOpacity style={styles.helpButton}>
+            <TouchableOpacity style={styles.helpButton} onPress={onFeedback}>
               <Image source={Images.chatBubble} style={styles.helpIcon} />
             </TouchableOpacity>
           </View>
@@ -82,12 +141,12 @@ function AccountScreen({ onLogout, onAccountInfo }: AccountScreenProps) {
 
         {/* Overlapping Stats Cards */}
         <View style={styles.statsContainer}>
-          <TouchableOpacity style={styles.statCard}>
+          <TouchableOpacity style={styles.statCard} onPress={onCoupons}>
             <Image source={Images.couponCard} style={styles.statIcon} />
             <View>
               <Text style={styles.statLabel}>{t('account.coupon')}</Text>
               <View style={styles.statValueRow}>
-                <Text style={styles.statValueNumber}>2</Text>
+                <Text style={styles.statValueNumber}>{availableCoupons}</Text>
                 <Text style={styles.statValueText}>
                   {t('account.available')}
                 </Text>
@@ -95,12 +154,20 @@ function AccountScreen({ onLogout, onAccountInfo }: AccountScreenProps) {
             </View>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.statCard}>
+          <TouchableOpacity
+            style={styles.statCard}
+            onPress={() => {
+              console.log('Loyalty Points card clicked');
+              if (onLoyaltyPoints) {
+                onLoyaltyPoints();
+              }
+            }}
+          >
             <Image source={Images.loyaltyCard} style={styles.statIcon} />
             <View>
               <Text style={styles.statLabel}>{t('account.loyaltyPoints')}</Text>
               <View style={styles.statValueRow}>
-                <Text style={styles.statValueNumber}>24</Text>
+                <Text style={styles.statValueNumber}>{loyaltyPoints}</Text>
                 <Text style={styles.statValueText}>{t('account.points')}</Text>
               </View>
             </View>
@@ -113,7 +180,21 @@ function AccountScreen({ onLogout, onAccountInfo }: AccountScreenProps) {
             <TouchableOpacity
               key={item.id}
               style={styles.menuItem}
-              onPress={item.id === '1' ? onAccountInfo : undefined}
+              onPress={() => {
+                console.log('Menu item clicked:', item.id, item.title);
+                if (item.id === '1') {
+                  onAccountInfo && onAccountInfo();
+                } else if (item.id === '2') {
+                  console.log('Calling onLoyaltyPoints');
+                  onLoyaltyPoints && onLoyaltyPoints();
+                } else if (item.id === '3') {
+                  onCoupons && onCoupons();
+                } else if (item.id === '4') {
+                  onOrderHistory && onOrderHistory();
+                } else if (item.id === '5') {
+                  onSettings && onSettings();
+                }
+              }}
             >
               <View style={styles.menuItemLeft}>
                 <Image

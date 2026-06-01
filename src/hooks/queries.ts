@@ -2,6 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { departmentService } from '../services/api/department';
 import { productService } from '../services/api/product';
 import { cartService } from '../services/api/cart';
+import {
+  addressService,
+  DefaultAddressResponse,
+} from '../services/api/address';
+import { checkoutService, CartCheckoutResponse } from '../services/api/checkout';
+import { orderService } from '../services/api/order';
+import { loyaltyService } from '../services/api/loyalty';
+import { customerService } from '../services/api/customer';
+import { categoryService } from '../services/api/category';
+import { offerService } from '../services/api/offer';
+import { wishlistService } from '../services/api/wishlist';
+import { promocodeService } from '../services/api/promocode';
+import { feedbackService } from '../services/api/feedback';
+import { addonsService } from '../services/api/addons';
 import Toast from 'react-native-toast-message';
 
 export const useDepartments = () => {
@@ -9,6 +23,76 @@ export const useDepartments = () => {
     queryKey: ['departments'],
     queryFn: () => departmentService.getDepartments(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useCategories = () => {
+  return useQuery({
+    queryKey: ['categories'],
+    queryFn: () => categoryService.getCategories(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useOffers = () => {
+  return useQuery({
+    queryKey: ['offers'],
+    queryFn: () => offerService.getOffers(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useOfferedProducts = (offerId: number) => {
+  return useQuery({
+    queryKey: ['offered-products', offerId],
+    queryFn: () => offerService.getOfferedProducts(offerId),
+    enabled: !!offerId,
+  });
+};
+
+export const useCustomerProfile = (customerId?: string) => {
+  return useQuery({
+    queryKey: ['customer-profile', customerId],
+    queryFn: async () => {
+      if (!customerId) {
+        return { success: false, data: null };
+      }
+      return customerService.getProfile(customerId);
+    },
+    enabled: !!customerId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useUpdateCustomerProfile = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      customerId,
+      profileData,
+    }: {
+      customerId: string;
+      profileData: any;
+    }) => {
+      return customerService.updateProfile(customerId, profileData);
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: ['customer-profile', variables.customerId],
+      });
+      Toast.show({
+        type: 'success',
+        text1: 'Profile Updated',
+        text2: 'Your profile has been updated successfully',
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: error?.message || 'Failed to update profile',
+      });
+    },
   });
 };
 
@@ -40,12 +124,31 @@ export const useProductsByDepartment = (departmentId?: number) => {
   });
 };
 
+export const useSearchProducts = (searchTerm: string) => {
+  return useQuery({
+    queryKey: ['products', 'search', searchTerm],
+    queryFn: async () => {
+      if (!searchTerm || searchTerm.trim() === '') {
+        return { data: [] };
+      }
+      console.log(`Searching products with term: ${searchTerm}...`);
+      const data = await productService.searchProducts(searchTerm);
+      console.log(`Search results:`, data);
+      return data;
+    },
+    enabled: !!searchTerm && searchTerm.trim() !== '',
+    staleTime: 30 * 1000, // 30 seconds
+  });
+};
+
 export const useCart = (customerId?: string, preorderDate?: string) => {
   return useQuery({
     queryKey: ['cart', customerId, preorderDate],
     queryFn: async () => {
       if (!customerId || !preorderDate) return { data: { carts: [] } };
-      console.log(`Fetching cart for customer ${customerId} on ${preorderDate}...`);
+      console.log(
+        `Fetching cart for customer ${customerId} on ${preorderDate}...`,
+      );
       const data = await cartService.getCart(customerId, preorderDate);
       console.log(`Cart fetched:`, data);
       return data;
@@ -59,12 +162,17 @@ export const useAddToCart = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (params: { customerId: string; productId: string; quantity: string; preorderDate: string }) => {
+    mutationFn: (params: {
+      customerId: string;
+      productId: string;
+      quantity: string;
+      preorderDate: string;
+    }) => {
       return cartService.addToCart(
         params.customerId,
         params.productId,
         params.quantity,
-        params.preorderDate
+        params.preorderDate,
       );
     },
     onSuccess: (data, variables) => {
@@ -86,12 +194,521 @@ export const useAddToCart = () => {
         });
       }
     },
-    onError: (error) => {
+    onError: error => {
       Toast.show({
         type: 'error',
         text1: 'Error',
         text2: error.message || 'An error occurred while adding to cart.',
       });
     },
+  });
+};
+
+export const useUpdateCartQuantity = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: {
+      customerId: string;
+      cartId: string;
+      productId: string;
+      quantity: string;
+      preorderDate: string;
+    }) => {
+      return cartService.updateCartQuantity(
+        params.customerId,
+        params.cartId,
+        params.productId,
+        params.quantity,
+      );
+    },
+    onSuccess: (data, variables) => {
+      if (data.success) {
+        // Invalidate cart query to refetch with updated quantities
+        queryClient.invalidateQueries({
+          queryKey: ['cart', variables.customerId, variables.preorderDate],
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: data.message || 'Failed to update quantity.',
+        });
+      }
+    },
+    onError: error => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'An error occurred while updating quantity.',
+      });
+    },
+  });
+};
+
+export const useRemoveFromCart = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: {
+      customerId: string;
+      cartId: string;
+      productId: string;
+      preorderDate: string;
+    }) => {
+      return cartService.removeFromCart(
+        params.customerId,
+        params.cartId,
+        params.productId,
+      );
+    },
+    onSuccess: (data, variables) => {
+      Toast.show({
+        type: 'success',
+        text1: 'Item Removed',
+        text2: data.message || 'Item removed from cart successfully!',
+      });
+      // Invalidate cart query to refetch without the removed item
+      queryClient.invalidateQueries({
+        queryKey: ['cart', variables.customerId, variables.preorderDate],
+      });
+    },
+    onError: (error: any) => {
+      // Handle thrown errors (network errors, validation errors, etc.)
+      console.error('Remove from cart error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'An error occurred while removing item.',
+      });
+    },
+  });
+};
+
+export const useSpecialRequest = () => {
+  return useMutation({
+    mutationFn: (params: {
+      cartId: string;
+      customerId: string;
+      specialRequest: string;
+    }) => {
+      return cartService.specialRequest(
+        params.cartId,
+        params.customerId,
+        params.specialRequest,
+      );
+    },
+    onSuccess: data => {
+      Toast.show({
+        type: 'success',
+        text1: 'Special Request Saved',
+        text2: data.message || 'Special request added successfully!',
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to save special request.',
+      });
+    },
+  });
+};
+
+export const useSavedAddresses = (customerId?: string) => {
+  return useQuery({
+    queryKey: ['saved-addresses', customerId],
+    queryFn: async () => {
+      if (!customerId) {
+        return { success: true, data: [] };
+      }
+
+      const data = await addressService.getSavedAddresses(customerId);
+      return data;
+    },
+    enabled: !!customerId,
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useDefaultAddress = (customerId?: string) => {
+  return useQuery<DefaultAddressResponse>({
+    queryKey: ['default-address', customerId],
+    queryFn: async (): Promise<DefaultAddressResponse> => {
+      if (!customerId) {
+        return { success: true, data: null };
+      }
+
+      const data = await addressService.getDefaultAddress(customerId);
+      return data;
+    },
+    enabled: !!customerId,
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useSaveAddress = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      customerId: string;
+      name: string;
+      phoneNo: string;
+      building: string;
+      street: string;
+      zone?: string;
+      addressType: string;
+      label: string;
+      additionalDirections: string;
+      apartment?: string;
+      floor?: string;
+      coordinates?: string;
+    }) => {
+      return addressService.saveNewAddress(payload);
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate saved addresses query to refetch
+      queryClient.invalidateQueries({
+        queryKey: ['saved-addresses', variables.customerId],
+      });
+      // Invalidate default address in case it changed
+      queryClient.invalidateQueries({
+        queryKey: ['default-address', variables.customerId],
+      });
+    },
+  });
+};
+
+export const useUpdateAddress = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      addressId: string;
+      customerId: string;
+      name: string;
+      phoneNo: string;
+      building: string;
+      street: string;
+      zone?: string;
+      addressType: string;
+      label: string;
+      additionalDirections: string;
+      apartment?: string;
+      floor?: string;
+      coordinates?: string;
+    }) => {
+      return addressService.updateAddress(payload);
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate saved addresses query to refetch
+      queryClient.invalidateQueries({
+        queryKey: ['saved-addresses', variables.customerId],
+      });
+      // Invalidate default address in case it changed
+      queryClient.invalidateQueries({
+        queryKey: ['default-address', variables.customerId],
+      });
+    },
+  });
+};
+
+export const useSetDefaultAddress = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: { addressId: string; customerId: string }) => {
+      return addressService.setDefaultAddress(payload);
+    },
+    onSuccess: (data, variables) => {
+      if (data.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: data.message || 'Default address set successfully!',
+        });
+      }
+      // Invalidate saved addresses query to refetch
+      queryClient.invalidateQueries({
+        queryKey: ['saved-addresses', variables.customerId],
+      });
+      // Invalidate default address query to refetch
+      queryClient.invalidateQueries({
+        queryKey: ['default-address', variables.customerId],
+      });
+    },
+    onError: (error: Error) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to set default address',
+      });
+    },
+  });
+};
+
+export const useCheckout = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: {
+      customer_id: string;
+      cart_id: string;
+      address_id: string;
+      use_wallet: number;
+      payment_type: number;
+    }) => {
+      return checkoutService.placeOrder(payload);
+    },
+    onSuccess: data => {
+      if (data.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Order Placed',
+          text2: data.message || 'Your order has been placed successfully!',
+        });
+        // Invalidate cart queries to clear the cart after checkout
+        queryClient.invalidateQueries({
+          queryKey: ['cart'],
+        });
+        // Invalidate orders queries to refresh order list
+        queryClient.invalidateQueries({
+          queryKey: ['orders'],
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: data.message || 'Failed to place order.',
+        });
+      }
+    },
+    onError: (error: Error) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'An error occurred while placing the order.',
+      });
+    },
+  });
+};
+
+export const useCartCheckout = () => {
+  return useMutation<
+    CartCheckoutResponse,
+    Error,
+    { customer_id: string; cart_id: string; delivery_date: string; delivery_time: string }
+  >({
+    mutationFn: payload => checkoutService.cartCheckout(payload),
+  });
+};
+
+export const useOrders = (customerId?: string, orderDate?: string) => {
+  return useQuery({
+    queryKey: ['orders', customerId, orderDate],
+    queryFn: async () => {
+      if (!customerId || !orderDate) {
+        return { success: true, data: { orders: [] } };
+      }
+      const data = await orderService.getOrdersByDate(customerId, orderDate);
+      return data;
+    },
+    enabled: !!customerId && !!orderDate,
+    staleTime: 60 * 1000, // 1 minute
+  });
+};
+
+export const useOrderHistory = (customerId?: string) => {
+  return useQuery({
+    queryKey: ['orderHistory', customerId],
+    queryFn: async () => {
+      if (!customerId) {
+        return {
+          success: true,
+          data: { orders: [], total_orders: 0, total_amount: 0 },
+        };
+      }
+      const data = await orderService.getOrderHistory(customerId);
+      return data;
+    },
+    enabled: !!customerId,
+    staleTime: 60 * 1000, // 1 minute
+  });
+};
+
+export const useLoyaltyPoints = (customerId?: string) => {
+  return useQuery({
+    queryKey: ['loyaltyPoints', customerId],
+    queryFn: async () => {
+      if (!customerId) {
+        return {
+          success: true,
+          data: { total_loyalty_points: 0, points_history: [] },
+        };
+      }
+      const data = await loyaltyService.getLoyaltyPoints(customerId);
+      return data;
+    },
+    enabled: !!customerId,
+    staleTime: 60 * 1000, // 1 minute
+  });
+};
+
+export const useWishlist = (customerId?: string) => {
+  return useQuery({
+    queryKey: ['wishlist', customerId],
+    queryFn: async () => {
+      if (!customerId) {
+        return { success: true, data: [] };
+      }
+      const data = await wishlistService.getWishlist(customerId);
+      console.log('Wishlist data fetched:', JSON.stringify(data, null, 2));
+      return data;
+    },
+    enabled: !!customerId,
+    staleTime: 0, // Always fetch fresh data
+  });
+};
+
+export const useAddToWishlist = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: { customerId: string; productId: string }) => {
+      return wishlistService.addToWishlist(params.customerId, params.productId);
+    },
+    onSuccess: async (data, variables) => {
+      console.log('Added to wishlist, response:', data);
+      Toast.show({
+        type: 'success',
+        text1: 'Added to Wishlist',
+        text2: data.message || 'Product added to wishlist!',
+      });
+      // Invalidate and refetch wishlist query immediately
+      await queryClient.invalidateQueries({
+        queryKey: ['wishlist', variables.customerId],
+      });
+      await queryClient.refetchQueries({
+        queryKey: ['wishlist', variables.customerId],
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to add to wishlist',
+      });
+    },
+  });
+};
+
+export const useRemoveFromWishlist = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params: { customerId: string; productId: string }) => {
+      return wishlistService.removeFromWishlist(
+        params.customerId,
+        params.productId,
+      );
+    },
+    onSuccess: async (data, variables) => {
+      console.log('Removed from wishlist, response:', data);
+      Toast.show({
+        type: 'success',
+        text1: 'Removed from Wishlist',
+        text2: data.message || 'Product removed from wishlist!',
+      });
+      // Invalidate and refetch wishlist query immediately
+      await queryClient.invalidateQueries({
+        queryKey: ['wishlist', variables.customerId],
+      });
+      await queryClient.refetchQueries({
+        queryKey: ['wishlist', variables.customerId],
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to remove from wishlist',
+      });
+    },
+  });
+};
+
+export const usePromocodes = () => {
+  return useQuery({
+    queryKey: ['promocodes'],
+    queryFn: async () => {
+      const data = await promocodeService.getPromocodes();
+      return data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useApplyPromocode = () => {
+  return useMutation({
+    mutationFn: (params: {
+      grandTotal: string | number;
+      customerId: string;
+      promoCode: string;
+    }) =>
+      promocodeService.applyPromocode(
+        params.grandTotal,
+        params.customerId,
+        params.promoCode,
+      ),
+    onSuccess: data => {
+      Toast.show({
+        type: 'success',
+        text1: data.message,
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: error.message,
+      });
+    },
+  });
+};
+
+export const useSubmitFeedback = () => {
+  return useMutation({
+    mutationFn: async (feedbackData: any) => {
+      console.log(
+        'useSubmitFeedback - Sending data:',
+        JSON.stringify(feedbackData, null, 2),
+      );
+      return feedbackService.submitFeedback(feedbackData);
+    },
+    onSuccess: data => {
+      console.log('useSubmitFeedback - Success:', data);
+      Toast.show({
+        type: 'success',
+        text1: 'Feedback Submitted',
+        text2: 'Thank you for your feedback!',
+      });
+    },
+    onError: (error: any) => {
+      console.log('useSubmitFeedback - Error:', error);
+      console.log('useSubmitFeedback - Error message:', error?.message);
+      Toast.show({
+        type: 'error',
+        text1: 'Submission Failed',
+        text2: error?.message || 'Failed to submit feedback',
+      });
+    },
+  });
+};
+
+export const useAddons = () => {
+  return useQuery({
+    queryKey: ['addons'],
+    queryFn: () => addonsService.getAddons(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

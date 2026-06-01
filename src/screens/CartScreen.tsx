@@ -4,29 +4,40 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
-  Image,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useCart } from '../hooks/queries';
-import { BASE_URL } from '../constants/api';
+import {
+  useCart,
+  useUpdateCartQuantity,
+  useRemoveFromCart,
+  useSpecialRequest,
+} from '../hooks/queries';
+import Header from '../components/common/Header';
+import CartItemCard from '../components/cart/CartItemCard';
+import SpecialRequestSection from '../components/cart/SpecialRequestSection';
+import OrderSummary from '../components/cart/OrderSummary';
 
 interface CartScreenProps {
   onBack: () => void;
+  onSelectDate?: (total: number, cartId: string) => void;
 }
 
-const CartScreen: React.FC<CartScreenProps> = ({ onBack }) => {
+const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   const { t } = useTranslation();
   const colors = useTheme();
+  const insets = useSafeAreaInsets();
 
   const [customerId, setCustomerId] = useState<string | undefined>(undefined);
+  const [customerIdLoaded, setCustomerIdLoaded] = useState(false);
   const [preorderDate, setPreorderDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split('T')[0],
   );
   const [orderType, setOrderType] = useState<'delivery' | 'pickup'>('delivery');
 
@@ -36,178 +47,245 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack }) => {
       if (id) {
         setCustomerId(id);
       }
+      setCustomerIdLoaded(true);
     };
     fetchCustomer();
   }, []);
 
-  const { data: cartResponse, isLoading } = useCart(customerId, preorderDate);
-  const cartData = cartResponse?.data?.carts?.[0]; // Assuming we just use the first cart
+  const {
+    data: cartResponse,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCart(customerId, preorderDate);
+
+  const isCartLoading = !customerIdLoaded || isLoading;
+  const { mutate: updateQuantity } = useUpdateCartQuantity();
+  const { mutate: removeFromCart } = useRemoveFromCart();
+  const { mutate: saveSpecialRequest } = useSpecialRequest();
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (cartResponse !== undefined) {
+      console.log(
+        '[CartScreen] Raw cart response:',
+        JSON.stringify(cartResponse, null, 2),
+      );
+    }
+    if (isError) {
+      console.log('[CartScreen] Cart fetch error:', error);
+    }
+  }, [cartResponse, isError, error]);
+
+  const cartData = (cartResponse?.data as any)?.cart;
   const items = cartData?.items || [];
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      if (refetch) {
+        await refetch();
+      }
+    } catch (error) {
+      console.error('Error refreshing cart:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const handleIncrease = (item: any) => {
+    if (!customerId || !cartData?.cart_id) return;
+    const newQuantity = parseInt(item.quantity) + 1;
+    updateQuantity({
+      customerId,
+      cartId: String(cartData.cart_id),
+      productId: item.product_id,
+      quantity: String(newQuantity),
+      preorderDate,
+    });
+  };
+
+  const handleDecrease = (item: any) => {
+    if (!customerId || !cartData?.cart_id) return;
+    const currentQuantity = parseInt(item.quantity);
+    if (currentQuantity <= 1) return; // Prevent going below 1, deletion handled separately
+    const newQuantity = currentQuantity - 1;
+    updateQuantity({
+      customerId,
+      cartId: String(cartData.cart_id),
+      productId: item.product_id,
+      quantity: String(newQuantity),
+      preorderDate,
+    });
+  };
+
+  const handleDelete = (item: any) => {
+    if (!customerId || !cartData?.cart_id) {
+      console.log('Cannot delete: missing customerId or cart_id', {
+        customerId,
+        cartId: cartData?.cart_id,
+      });
+      return;
+    }
+
+    console.log('Deleting item:', {
+      customerId,
+      cartId: String(cartData.cart_id),
+      productId: item.product_id,
+    });
+
+    removeFromCart({
+      customerId,
+      cartId: String(cartData.cart_id),
+      productId: item.product_id,
+      preorderDate,
+    });
+  };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.white }]}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.borderSubtle }]}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={{ color: colors.text, fontSize: fs(24) }}>{'<'}</Text>
-        </TouchableOpacity>
-        <Text style={[styles.title, { color: colors.text }]}>Cart</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header
+        title="Cart"
+        onBack={onBack}
+        containerStyle={{
+          backgroundColor: colors.white,
+          paddingBottom: sh(16),
+          paddingTop: insets.top + sh(12),
+        }}
+      />
 
-      {/* Order Type Toggle */}
-      <View style={styles.toggleContainer}>
-        <TouchableOpacity
-          style={[
-            styles.toggleButton,
-            orderType === 'delivery' ? { backgroundColor: colors.primary } : { backgroundColor: 'transparent' },
-          ]}
-          onPress={() => setOrderType('delivery')}
-        >
-          <Text
-            style={[
-              styles.toggleText,
-              { color: orderType === 'delivery' ? colors.white : colors.textMuted },
-            ]}
-          >
-            Delivery
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.toggleButton,
-            orderType === 'pickup' ? { backgroundColor: colors.primary } : { backgroundColor: 'transparent' },
-          ]}
-          onPress={() => setOrderType('pickup')}
-        >
-          <Text
-            style={[
-              styles.toggleText,
-              { color: orderType === 'pickup' ? colors.white : colors.textMuted },
-            ]}
-          >
-            Pickup
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {isLoading ? (
+      {isCartLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
+      ) : isError ? (
+        <View style={styles.loadingContainer}>
+          <Text style={{ color: colors.textMuted, textAlign: 'center' }}>
+            {'Failed to load cart.\n' +
+              ((error as any)?.message || 'Unknown error')}
+          </Text>
+          <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12 }}>
+            <Text style={{ color: colors.primary }}>Retry</Text>
+          </TouchableOpacity>
+        </View>
       ) : (
-        <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={{ flexGrow: 1 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        >
           {/* Cart Items List */}
           <View style={styles.itemsList}>
             {items.length === 0 ? (
-              <Text style={{ textAlign: 'center', marginTop: 20, color: colors.textMuted }}>
+              <Text
+                style={{
+                  textAlign: 'center',
+                  marginTop: 20,
+                  color: colors.textMuted,
+                }}
+              >
                 Your cart is empty.
               </Text>
             ) : (
-              items.map((item, index) => (
-                <View key={index} style={styles.cartItem}>
-                  <Image
-                    source={{ uri: `${BASE_URL}${item.image}` }}
-                    style={styles.itemImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.itemDetails}>
-                    <View style={styles.itemHeaderRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.itemName, { color: colors.text }]} numberOfLines={2}>
-                          {item.product_name}
-                        </Text>
-                        <Text style={[styles.itemCategory, { color: colors.textMuted }]}>
-                          {item.department?.name_en}
-                        </Text>
-                      </View>
-                      <TouchableOpacity style={styles.deleteBtn}>
-                        <Text style={{ fontSize: fs(18) }}>🗑️</Text>
-                      </TouchableOpacity>
-                    </View>
-                    
-                    <View style={styles.itemFooterRow}>
-                      <View style={styles.quantityControl}>
-                        <TouchableOpacity style={styles.qtyBtn}>
-                          <Text style={{ color: colors.primary, fontSize: fs(18) }}>-</Text>
-                        </TouchableOpacity>
-                        <Text style={{ fontSize: fs(16), marginHorizontal: sw(12) }}>{item.quantity}</Text>
-                        <TouchableOpacity style={styles.qtyBtn}>
-                          <Text style={{ color: colors.primary, fontSize: fs(18) }}>+</Text>
-                        </TouchableOpacity>
-                      </View>
-                      <Text style={[styles.itemTotal, { color: colors.text }]}>
-                        {parseFloat(item.price) * parseInt(item.quantity)} QAR
-                      </Text>
-                    </View>
-                  </View>
-                </View>
+              items.map((item: any, index: number) => (
+                <CartItemCard
+                  key={index}
+                  item={item}
+                  colors={colors}
+                  onIncrease={() => handleIncrease(item)}
+                  onDecrease={() => handleDecrease(item)}
+                  onDelete={() => handleDelete(item)}
+                />
               ))
             )}
           </View>
 
           {items.length > 0 && (
-            <>
-              {/* Special Request */}
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>💬 Any special request</Text>
-                <TouchableOpacity style={styles.addBtn}>
-                  <Text style={styles.addBtnText}>Add+</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Coupon */}
-              <View style={styles.sectionContainer}>
-                <Text style={styles.sectionTitle}>🎫 Coupon</Text>
-                <View style={styles.actionButtonsRow}>
-                  <TouchableOpacity style={styles.outlineActionBtn}>
-                    <Text style={styles.outlineActionBtnText}>Add items</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.filledActionBtn}>
-                    <Text style={styles.filledActionBtnText}>Select date</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Order Summary */}
-              <View style={styles.summaryContainer}>
-                <Text style={styles.sectionTitle}>🧾 Order summary</Text>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Subtotal</Text>
-                  <Text style={styles.summaryValue}>{cartData?.subtotal || 0} QAR</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Delivery</Text>
-                  <Text style={styles.summaryValue}>0 QAR</Text>
-                </View>
-                <View style={styles.summaryRow}>
-                  <Text style={styles.summaryLabel}>Coupon</Text>
-                  <Text style={styles.summaryValue}>0 QAR</Text>
-                </View>
-                <View style={[styles.summaryRow, { marginTop: sh(10) }]}>
-                  <Text style={[styles.summaryLabel, { fontFamily: colors.fontBold, color: colors.text }]}>
-                    Total amount
-                  </Text>
-                  <Text style={[styles.summaryValue, { fontFamily: colors.fontBold, color: colors.text }]}>
-                    {cartData?.total_amount || 0} QAR
-                  </Text>
-                </View>
-              </View>
-            </>
+            <View style={styles.paddedContent}>
+              <SpecialRequestSection
+                colors={colors}
+                onSave={text => {
+                  if (customerId && cartData?.cart_id) {
+                    saveSpecialRequest({
+                      cartId: String(cartData.cart_id),
+                      customerId,
+                      specialRequest: text,
+                    });
+                  }
+                }}
+              />
+            </View>
           )}
+
+          {items.length > 0 && (
+            <OrderSummary
+              colors={colors}
+              subtotal={cartData?.subtotal || 0}
+              delivery={0}
+              total={cartData?.total_amount || 0}
+            />
+          )}
+
           <View style={{ height: sh(100) }} />
         </ScrollView>
       )}
 
-      {/* Checkout Button */}
-      {items.length > 0 && (
-        <View style={[styles.footer, { backgroundColor: colors.background, borderTopColor: colors.borderSubtle }]}>
-          <TouchableOpacity style={[styles.checkoutBtn, { backgroundColor: colors.primary }]}>
-            <Text style={styles.checkoutBtnText}>Checkout</Text>
+      {/* Fixed Footer Buttons */}
+      {items.length > 0 && !isCartLoading && (
+        <View
+          style={[
+            styles.footer,
+            {
+              backgroundColor: colors.white,
+              paddingBottom: insets.bottom + sh(16),
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={[styles.outlineBtn, { borderColor: colors.border }]}
+            onPress={onBack}
+          >
+            <Text
+              style={[
+                styles.outlineBtnText,
+                { color: colors.text, fontFamily: colors.fontSemiBold },
+              ]}
+            >
+              Add items
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.filledBtn, { backgroundColor: colors.primary }]}
+            onPress={() =>
+              onSelectDate?.(
+                cartData?.total_amount || 0,
+                String(cartData?.cart_id || ''),
+              )
+            }
+          >
+            <Text
+              style={[
+                styles.filledBtnText,
+                { color: colors.white, fontFamily: colors.fontSemiBold },
+              ]}
+            >
+              Select date
+            </Text>
           </TouchableOpacity>
         </View>
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -215,41 +293,29 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: sw(16),
-    paddingVertical: sh(12),
-  },
-  backButton: {
-    padding: sw(8),
-    marginLeft: -sw(8),
-  },
-  title: {
-    fontSize: fs(20),
-    fontWeight: 'bold',
-  },
-  placeholder: {
-    width: sw(40),
-  },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
-    borderRadius: sw(20),
     marginHorizontal: sw(20),
-    marginTop: sh(10),
-    padding: sw(4),
+    marginBottom: sh(16),
+    gap: sw(12),
   },
   toggleButton: {
-    flex: 1,
-    paddingVertical: sh(8),
-    borderRadius: sw(16),
+    paddingVertical: sh(12),
+    paddingHorizontal: sw(32),
+    borderRadius: sw(25),
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeToggle: {
+    // Primary background passed inline
+  },
+  inactiveToggle: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
   },
   toggleText: {
     fontSize: fs(14),
-    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,
@@ -260,148 +326,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemsList: {
-    paddingTop: sh(20),
-  },
-  cartItem: {
-    flexDirection: 'row',
     paddingHorizontal: sw(20),
-    marginBottom: sh(24),
   },
-  itemImage: {
-    width: sw(80),
-    height: sw(80),
-    borderRadius: sw(16),
-    backgroundColor: '#F5F5F5',
-  },
-  itemDetails: {
-    flex: 1,
-    marginLeft: sw(16),
-    justifyContent: 'space-between',
-  },
-  itemHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-  },
-  itemName: {
-    fontSize: fs(16),
-    fontWeight: '600',
-    marginBottom: sh(4),
-  },
-  itemCategory: {
-    fontSize: fs(12),
-  },
-  deleteBtn: {
-    padding: sw(4),
-  },
-  itemFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: sh(8),
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFF1E6',
-    borderRadius: sw(20),
-    paddingHorizontal: sw(12),
-    paddingVertical: sh(4),
-  },
-  qtyBtn: {
-    paddingHorizontal: sw(8),
-  },
-  itemTotal: {
-    fontSize: fs(16),
-    fontWeight: '600',
-  },
-  sectionContainer: {
+  paddedContent: {
     paddingHorizontal: sw(20),
-    marginTop: sh(24),
-  },
-  sectionTitle: {
-    fontSize: fs(18),
-    fontWeight: 'bold',
-    marginBottom: sh(16),
-    color: '#333',
-  },
-  addBtn: {
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderRadius: sw(20),
-    paddingHorizontal: sw(20),
-    paddingVertical: sh(8),
-    alignSelf: 'flex-start',
-  },
-  addBtnText: {
-    fontSize: fs(14),
-    color: '#666',
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: sw(12),
-  },
-  outlineActionBtn: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#333',
-    borderRadius: sw(25),
-    paddingVertical: sh(12),
-    alignItems: 'center',
-  },
-  outlineActionBtnText: {
-    fontSize: fs(16),
-    color: '#333',
-    fontWeight: '500',
-  },
-  filledActionBtn: {
-    flex: 1,
-    backgroundColor: '#FF7B00',
-    borderRadius: sw(25),
-    paddingVertical: sh(12),
-    alignItems: 'center',
-  },
-  filledActionBtnText: {
-    fontSize: fs(16),
-    color: '#FFF',
-    fontWeight: '500',
-  },
-  summaryContainer: {
-    paddingHorizontal: sw(20),
-    marginTop: sh(32),
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: sh(12),
-  },
-  summaryLabel: {
-    fontSize: fs(14),
-    color: '#666',
-  },
-  summaryValue: {
-    fontSize: fs(14),
-    color: '#333',
-    fontWeight: '500',
   },
   footer: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    flexDirection: 'row',
     paddingHorizontal: sw(20),
     paddingTop: sh(16),
     borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+    gap: sw(16),
   },
-  checkoutBtn: {
-    borderRadius: sw(30),
-    paddingVertical: sh(16),
+  outlineBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: sw(25),
+    paddingVertical: sh(12),
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  outlineBtnText: {
+    fontSize: fs(14),
+  },
+  filledBtn: {
+    flex: 1,
+    borderRadius: sw(25),
+    paddingVertical: sh(12),
     alignItems: 'center',
   },
-  checkoutBtnText: {
-    color: '#FFF',
-    fontSize: fs(18),
-    fontWeight: 'bold',
+  filledBtnText: {
+    fontSize: fs(14),
   },
 });
 
