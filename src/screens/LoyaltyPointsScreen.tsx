@@ -16,7 +16,7 @@ import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useLoyaltyPoints } from '../hooks/queries';
+import { useLoyaltyPoints, useCustomerProfile } from '../hooks/queries';
 import { PointHistory } from '../services/api/loyalty';
 import { Images } from '../assets/images';
 
@@ -56,9 +56,35 @@ const LoyaltyPointsScreen: React.FC<LoyaltyPointsScreenProps> = ({
     refetch,
   } = useLoyaltyPoints(customerId);
 
+  const { data: profileResponse } = useCustomerProfile(customerId);
+  const userName = profileResponse?.data?.name_en || 'Sara';
+
+  const [showAll, setShowAll] = useState(false);
+
   const totalPoints = loyaltyResponse?.data?.total_loyalty_points || 0;
   const pointsHistory = loyaltyResponse?.data?.points_history || [];
-  const recentHistory = pointsHistory.slice(0, 5);
+
+  const isToday = (dateString?: string) => {
+    if (!dateString) return false;
+    try {
+      const date = new Date(dateString);
+      const today = new Date();
+      return (
+        date.getDate() === today.getDate() &&
+        date.getMonth() === today.getMonth() &&
+        date.getFullYear() === today.getFullYear()
+      );
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const todayHistory = pointsHistory.filter(item => isToday(item.created_at));
+  const historyToDisplay = showAll
+    ? pointsHistory
+    : todayHistory.length > 0
+    ? todayHistory
+    : pointsHistory.slice(0, 5);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -73,9 +99,28 @@ const LoyaltyPointsScreen: React.FC<LoyaltyPointsScreenProps> = ({
     }
   };
 
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return '';
+    try {
+      const date = new Date(dateString);
+      const isTodayVal = isToday(dateString);
+      const day = date.getDate();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const month = months[date.getMonth()];
+      
+      if (isTodayVal) {
+        return `Today ${day} ${month}`;
+      } else {
+        return `${day} ${month} ${date.getFullYear()}`;
+      }
+    } catch (e) {
+      return dateString || '';
+    }
+  };
+
   const renderHistoryItem = (item: PointHistory) => {
-    const isCredit = item.type === 'credit' || item.points > 0;
-    const points = Math.abs(item.points);
+    const isCredit = item.points_earned >= 0;
+    const points = Math.abs(item.points_earned || 0);
 
     return (
       <View key={item.id} style={styles.historyItem}>
@@ -83,9 +128,11 @@ const LoyaltyPointsScreen: React.FC<LoyaltyPointsScreenProps> = ({
           <Image source={Images.account} style={styles.historyIcon} />
         </View>
         <View style={styles.historyDetails}>
-          <Text style={styles.historyName}>{item.description || 'Sara'}</Text>
+          <Text style={styles.historyName}>
+            {item.order?.unique_id || userName}
+          </Text>
           <Text style={styles.historyDate}>
-            {item.formatted_date || 'Today 25 Nov'}
+            {formatDate(item.created_at)}
           </Text>
         </View>
         <Text
@@ -156,9 +203,6 @@ const LoyaltyPointsScreen: React.FC<LoyaltyPointsScreenProps> = ({
                   {t('loyaltyPoints.points')}
                 </Text>
               </Text>
-              <Text style={styles.pointsDescription}>
-                {t('loyaltyPoints.description')}
-              </Text>
             </View>
           </ImageBackground>
         </View>
@@ -169,14 +213,14 @@ const LoyaltyPointsScreen: React.FC<LoyaltyPointsScreenProps> = ({
             <Text style={styles.historySectionTitle}>
               {t('loyaltyPoints.pointHistory')}
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => setShowAll(prev => !prev)}>
               <Text style={styles.seeAllButton}>
-                {t('loyaltyPoints.seeAll')} {'>'}
+                {showAll ? 'Show less <' : `${t('loyaltyPoints.seeAll')} >`}
               </Text>
             </TouchableOpacity>
           </View>
 
-          {recentHistory.length === 0 ? (
+          {historyToDisplay.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyStateText}>
                 {t('loyaltyPoints.noHistory')}
@@ -184,7 +228,7 @@ const LoyaltyPointsScreen: React.FC<LoyaltyPointsScreenProps> = ({
             </View>
           ) : (
             <View style={styles.historyList}>
-              {recentHistory.map(item => renderHistoryItem(item))}
+              {historyToDisplay.map(item => renderHistoryItem(item))}
             </View>
           )}
         </View>
@@ -216,7 +260,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(40),
       height: sw(40),
       borderRadius: sw(20),
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
       justifyContent: 'center',
       alignItems: 'center',
       shadowColor: '#000',
@@ -320,7 +364,7 @@ const createStyles = (colors: any, insets: any) =>
       color: colors.textMuted,
     },
     historyList: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
       borderRadius: sw(12),
       padding: sw(4),
     },

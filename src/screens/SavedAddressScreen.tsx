@@ -336,7 +336,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
       paddingTop: insets.top + sh(8),
     },
     headerRow: {
@@ -344,7 +344,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       justifyContent: 'center',
     },
     headerContainer: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
       paddingRight: sw(120),
     },
     addButton: {
@@ -359,7 +359,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
     },
     addButtonText: {
       color: colors.text,
@@ -425,7 +425,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       borderRadius: sw(24),
       paddingHorizontal: sw(20),
       paddingVertical: sh(18),
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
     },
     addressTitleRow: {
       flexDirection: 'row',
@@ -471,7 +471,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       borderRadius: sw(16),
       borderWidth: 1,
       borderColor: colors.primary,
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
     },
     setDefaultButtonText: {
       color: colors.primary,
@@ -488,7 +488,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       width: sw(32),
       height: sw(32),
       borderRadius: sw(16),
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
@@ -530,7 +530,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
     proceedContainer: {
       padding: sw(20),
       paddingBottom: insets.bottom + sh(20),
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
       borderTopWidth: 1,
       borderTopColor: colors.borderSubtle,
     },

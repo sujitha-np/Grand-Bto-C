@@ -64,16 +64,10 @@ export const offerService = {
       );
 
       // Use 'bearer' header instead of 'Authorization'
-      const { data } = await apiClient.post('/products/offers', undefined, {
+      const { data } = await apiClient.post('/products/offers', {}, {
         headers: {
-          bearer: token, // Header name is 'bearer', not 'Authorization'
+          bearer: token,
         },
-        transformRequest: [
-          (data, headers) => {
-            delete headers['Content-Type'];
-            return data;
-          },
-        ],
       });
       console.log('Raw offers API response:', data);
 

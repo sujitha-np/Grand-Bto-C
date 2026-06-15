@@ -404,7 +404,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(43),
       height: sw(43),
       borderRadius: sw(100),
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -414,13 +414,13 @@ const createStyles = (colors: any, insets: any) =>
     },
     locationText: {
       fontSize: fs(14),
-      color: '#3B2B20',
+      color: colors.darkBrown,
       fontFamily: colors.fontMedium,
     },
     arrowIcon: {
       width: sw(12),
       height: sw(12),
-      tintColor: '#3B2B20',
+      tintColor: colors.darkBrown,
     },
     headerIcons: {
       flexDirection: 'row',
@@ -432,7 +432,7 @@ const createStyles = (colors: any, insets: any) =>
       borderRadius: sw(20),
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
     },
     headerIcon: {
       width: sw(20),
@@ -441,7 +441,7 @@ const createStyles = (colors: any, insets: any) =>
     headerTitle: {
       fontSize: fs(31),
       lineHeight: fs(36),
-      color: '#3B2B20',
+      color: colors.darkBrown,
       marginBottom: sh(10),
       fontFamily: colors.fontBold,
     },
@@ -452,14 +452,14 @@ const createStyles = (colors: any, insets: any) =>
       paddingHorizontal: sw(16),
       paddingVertical: sh(12),
       marginTop: sh(24),
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.inputBackground || colors.card,
     },
     searchIconImage: { width: sw(18), height: sw(18), marginRight: sw(8) },
     searchInput: {
       flex: 1,
       fontSize: fs(14),
       padding: 0,
-      color: '#1E1E1E',
+      color: colors.text,
       fontFamily: colors.fontRegular,
     },
     modalOverlay: {
@@ -470,7 +470,7 @@ const createStyles = (colors: any, insets: any) =>
       paddingHorizontal: sw(20),
     },
     modalContent: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.card,
       borderRadius: sw(16),
       padding: sw(20),
       shadowColor: '#000',
@@ -498,7 +498,7 @@ const createStyles = (colors: any, insets: any) =>
     modalTitle: {
       fontSize: fs(18),
       fontFamily: colors.fontSemiBold,
-      color: '#3B2B20',
+      color: colors.darkBrown,
     },
     closeButton: {
       fontSize: fs(24),
@@ -511,7 +511,7 @@ const createStyles = (colors: any, insets: any) =>
     addressName: {
       fontSize: fs(16),
       fontFamily: colors.fontSemiBold,
-      color: '#3B2B20',
+      color: colors.darkBrown,
     },
     addressLine: {
       fontSize: fs(14),

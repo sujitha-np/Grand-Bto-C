@@ -92,9 +92,9 @@ export const darkColors: AppColors = {
   fontInterMedium: 'Inter-Medium',
   fontInterSemiBold: 'Inter-SemiBold',
   fontInterRegular: 'Inter-Regular',
-  darkBrown: '#3B2B20',
+  darkBrown: '#F0F0F0',
   lightBrown: '#B88A52',
   lightGray: '#252525',
-  offWhite: '#F7F5F1',
-  placeholderGray: '#252525',
+  offWhite: '#222222',
+  placeholderGray: '#777777',
 };

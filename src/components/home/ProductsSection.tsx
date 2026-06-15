@@ -162,12 +162,44 @@ function ProductsSection({
                   </View>
                 )}
                 <View style={styles.priceRow}>
-                  <Text style={styles.productPrice}>
-                    {parseFloat(product.net_price)
-                      .toFixed(2)
-                      .replace(/\.00$/, '')}{' '}
-                    QAR
-                  </Text>
+                  <View style={styles.priceWrapper}>
+                    {(() => {
+                      const hasOffer = product.offer != null && product.offer.offer_price != null && product.offer.offer_price !== '';
+                      if (hasOffer) {
+                        const offerPrice = product.offer!.offer_price;
+                        const originalPrice = product.price;
+                        const isDiscounted = parseFloat(offerPrice) < parseFloat(originalPrice);
+                        if (isDiscounted) {
+                          return (
+                            <>
+                              <Text style={styles.productPrice}>
+                                {parseFloat(offerPrice)
+                                  .toFixed(2)
+                                  .replace(/\.00$/, '')}{' '}
+                                QAR
+                              </Text>
+                              <Text style={styles.originalPrice}>
+                                {parseFloat(originalPrice)
+                                  .toFixed(2)
+                                  .replace(/\.00$/, '')}{' '}
+                                QAR
+                              </Text>
+                            </>
+                          );
+                        }
+                      }
+                      
+                      const displayPrice = hasOffer ? product.offer!.offer_price : product.price;
+                      return (
+                        <Text style={styles.productPrice}>
+                          {parseFloat(displayPrice)
+                            .toFixed(2)
+                            .replace(/\.00$/, '')}{' '}
+                          QAR
+                        </Text>
+                      );
+                    })()}
+                  </View>
                   <TouchableOpacity
                     style={styles.addButton}
                     onPress={() => {
@@ -260,6 +292,17 @@ const createStyles = (colors: any) =>
       fontSize: fs(15),
       color: colors.success,
       fontFamily: colors.fontInterSemiBold,
+    },
+    originalPrice: {
+      fontSize: fs(12),
+      color: colors.textMuted,
+      textDecorationLine: 'line-through',
+      fontFamily: colors.fontRegular,
+    },
+    priceWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: sw(6),
     },
     priceRow: {
       flexDirection: 'row',

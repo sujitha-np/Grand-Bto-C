@@ -1,11 +1,10 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  FlatList,
   Modal,
   ActivityIndicator,
 } from 'react-native';
@@ -13,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import Header from '../components/common/Header';
-import { useCartCheckout } from '../hooks/queries';
+import { useCartCheckout, usePreorderLimit } from '../hooks/queries';
 import { NonDeliverableProduct } from '../services/api/checkout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -22,6 +21,7 @@ interface CalendarScreenProps {
   totalAmount: number;
   onCheckout: (selectedDate: string) => void;
   cartId?: string;
+  customerId?: string;
 }
 
 const DAYS_OF_WEEK = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -45,19 +45,51 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
   totalAmount,
   onCheckout,
   cartId,
+  customerId: propCustomerId,
 }) => {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const { mutate: validateCheckout, isPending: validating } = useCartCheckout();
-  const [customerId, setCustomerId] = useState<string | null>(null);
+  const { data: preorderLimitData, isLoading: loadingLimit } = usePreorderLimit();
+  const [customerId, setCustomerId] = useState<string | null>(propCustomerId || null);
 
   useEffect(() => {
-    AsyncStorage.getItem('customerId').then(id => {
-      if (id) setCustomerId(id);
-    });
-  }, []);
+    if (propCustomerId) {
+      setCustomerId(propCustomerId);
+    } else {
+      AsyncStorage.getItem('customerId').then(id => {
+        if (id) setCustomerId(id);
+      });
+    }
+  }, [propCustomerId]);
 
-  const today = new Date();
+  const getQatarDate = (): Date => {
+    const now = new Date();
+    const localOffsetMinutes = -now.getTimezoneOffset();
+    const qatarOffsetMinutes = 180;
+    const diffMs = (qatarOffsetMinutes - localOffsetMinutes) * 60000;
+    return new Date(now.getTime() + diffMs);
+  };
+
+  const today = getQatarDate();
+
+  const maxPreorderDate = useMemo(() => {
+    if (preorderLimitData?.max_preorder_date) {
+      const parts = preorderLimitData.max_preorder_date.split('-');
+      if (parts.length === 3) {
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const day = parseInt(parts[2], 10);
+        return new Date(year, month, day, 23, 59, 59, 999);
+      }
+    }
+    // Fallback to today + 14 days
+    const fallback = getQatarDate();
+    fallback.setDate(fallback.getDate() + 14);
+    fallback.setHours(23, 59, 59, 999);
+    return fallback;
+  }, [preorderLimitData]);
+
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -74,6 +106,46 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
     requestedDelivery: '',
     suggestion: '',
   });
+
+  const isSelectedDateToday = useMemo(() => {
+    if (!selectedDate) return false;
+    const now = getQatarDate();
+    return (
+      selectedDate.getDate() === now.getDate() &&
+      selectedDate.getMonth() === now.getMonth() &&
+      selectedDate.getFullYear() === now.getFullYear()
+    );
+  }, [selectedDate]);
+
+  const availableHours = useMemo(() => {
+    if (!isSelectedDateToday) return HOURS;
+    const now = getQatarDate();
+    const curHour = now.getHours();
+    const curMin = now.getMinutes();
+
+    return HOURS.filter(h => {
+      if (h.value > curHour) return true;
+      if (h.value === curHour) {
+        return curMin < 45;
+      }
+      return false;
+    });
+  }, [isSelectedDateToday]);
+
+  const availableMinutes = useMemo(() => {
+    if (selectedHour === null) return [];
+    if (!isSelectedDateToday) return MINUTES;
+
+    const now = getQatarDate();
+    const curHour = now.getHours();
+    const curMin = now.getMinutes();
+
+    if (selectedHour === curHour) {
+      return MINUTES.filter(m => m.value > curMin);
+    }
+
+    return MINUTES;
+  }, [selectedHour, isSelectedDateToday]);
 
   const monthNames = [
     'January',
@@ -123,7 +195,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
   };
 
   const handleToday = () => {
-    const now = new Date();
+    const now = getQatarDate();
     setSelectedDate(now);
     setCurrentMonth(now.getMonth());
     setCurrentYear(now.getFullYear());
@@ -161,7 +233,12 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
       today.getMonth(),
       today.getDate(),
     );
-    return date < todayStart;
+    if (date < todayStart) return true;
+
+    if (maxPreorderDate && date > maxPreorderDate) {
+      return true;
+    }
+    return false;
   };
 
   const formatShortDate = (date: Date | null) => {
@@ -259,12 +336,20 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
       )}:00`;
 
       if (!customerId || !cartId) {
+        console.log('[CalendarScreen] handleCheckout - missing customerId or cartId:', { customerId, cartId });
         onCheckout(dateStr);
         return;
       }
 
       const deliveryDate = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}`;
       const deliveryTime = `${pad(selectedHour)}:${pad(selectedMinute)}`;
+
+      console.log('[CalendarScreen] handleCheckout - validating with parameters:', {
+        customer_id: customerId,
+        cart_id: cartId,
+        delivery_date: deliveryDate,
+        delivery_time: deliveryTime,
+      });
 
       validateCheckout(
         {
@@ -275,7 +360,9 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
         },
         {
           onSuccess: res => {
+            console.log('[CalendarScreen] validateCheckout onSuccess:', res);
             if (
+              res &&
               !res.success &&
               res.error_code === 'PREPARATION_TIME_CONFLICT' &&
               res.non_deliverable_products?.length
@@ -290,9 +377,26 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
               onCheckout(dateStr);
             }
           },
-          onError: () => {
-            // On network/server error, allow user to proceed
-            onCheckout(dateStr);
+          onError: (error: any) => {
+            console.log('[CalendarScreen] validateCheckout onError:', error);
+            const res = error?.data;
+            console.log('[CalendarScreen] validateCheckout onError parsed res:', res);
+            if (
+              res &&
+              !res.success &&
+              res.error_code === 'PREPARATION_TIME_CONFLICT' &&
+              res.non_deliverable_products?.length
+            ) {
+              setConflictModal({
+                visible: true,
+                nonDeliverableProducts: res.non_deliverable_products,
+                requestedDelivery: res.requested_delivery || dateStr,
+                suggestion: res.suggestion || '',
+              });
+            } else {
+              // On network/server error, allow user to proceed
+              onCheckout(dateStr);
+            }
           },
         },
       );
@@ -302,18 +406,38 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
   const canCheckout =
     selectedDate !== null && selectedHour !== null && selectedMinute !== null;
 
+  if (loadingLimit) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <Header
+          title="Calendar"
+          onBack={onBack}
+          containerStyle={{
+            backgroundColor: colors.background,
+            paddingBottom: sh(16),
+            paddingTop: insets.top + sh(12),
+          }}
+        />
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.white }]}
-      contentContainerStyle={{ paddingBottom: sh(120) }}
-      showsVerticalScrollIndicator={false}
-    >
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: sh(120) }}
+        showsVerticalScrollIndicator={false}
+      >
       {/* Header */}
       <Header
         title="Calendar"
         onBack={onBack}
         containerStyle={{
-          backgroundColor: colors.white,
+          backgroundColor: colors.background,
           paddingBottom: sh(16),
           paddingTop: insets.top + sh(12),
         }}
@@ -455,7 +579,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
             showsHorizontalScrollIndicator={false}
             style={styles.timeRow}
           >
-            {HOURS.map(h => {
+            {availableHours.map(h => {
               const active = selectedHour === h.value;
               return (
                 <TouchableOpacity
@@ -505,7 +629,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
                 Minute
               </Text>
               <View style={styles.minuteRow}>
-                {MINUTES.map(m => {
+                {availableMinutes.map(m => {
                   const active = selectedMinute === m.value;
                   return (
                     <TouchableOpacity
@@ -597,85 +721,87 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
         </View>
       )}
 
-      {/* Preparation Time Conflict Modal */}
-      <Modal
-        visible={conflictModal.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConflictModal(prev => ({ ...prev, visible: false }))}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.white }]}>
-            {/* Warning icon + title */}
-            <View style={styles.modalTitleRow}>
-              <Text style={styles.modalWarningIcon}>⚠️</Text>
-              <Text style={[styles.modalTitle, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
-                Delivery Not Available
-              </Text>
-            </View>
-
-            <Text style={[styles.modalSubtitle, { color: colors.textMuted, fontFamily: colors.fontRegular }]}>
-              The following items need more preparation time and cannot be
-              delivered at your selected time:
-            </Text>
-
-            {/* Product list */}
-            {conflictModal.nonDeliverableProducts.map((p, i) => (
-              <View
-                key={i}
-                style={[styles.conflictItem, { borderColor: colors.borderSubtle, backgroundColor: colors.background || '#FAF6F2' }]}
-              >
-                <Text style={[styles.conflictProductName, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
-                  {p.product_name}
-                </Text>
-                <View style={styles.conflictDetailRow}>
-                  <Text style={[styles.conflictDetailLabel, { color: colors.textMuted }]}>Prep time:</Text>
-                  <Text style={[styles.conflictDetailValue, { color: colors.darkBrown || colors.text, fontFamily: colors.fontSemiBold }]}>
-                    {p.preparation_time}
-                  </Text>
-                </View>
-                <View style={styles.conflictDetailRow}>
-                  <Text style={[styles.conflictDetailLabel, { color: colors.textMuted }]}>Earliest delivery:</Text>
-                  <Text style={[styles.conflictDetailValue, { color: colors.primary, fontFamily: colors.fontSemiBold }]}>
-                    {p.earliest_delivery}
-                  </Text>
-                </View>
-              </View>
-            ))}
-
-            {/* Divider */}
-            <View style={[styles.modalDivider, { backgroundColor: colors.borderSubtle }]} />
-
-            {/* Requested time */}
-            <View style={styles.conflictDetailRow}>
-              <Text style={[styles.conflictDetailLabel, { color: colors.textMuted }]}>Your selected time:</Text>
-              <Text style={[styles.conflictDetailValue, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
-                {conflictModal.requestedDelivery}
-              </Text>
-            </View>
-
-            {/* Suggestion */}
-            {!!conflictModal.suggestion && (
-              <Text style={[styles.modalSuggestion, { color: colors.primary, fontFamily: colors.fontRegular }]}>
-                💡 {conflictModal.suggestion}
-              </Text>
-            )}
-
-            {/* Action button */}
-            <TouchableOpacity
-              style={[styles.modalBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setConflictModal(prev => ({ ...prev, visible: false }))}
-              activeOpacity={0.8}
-            >
-              <Text style={[styles.modalBtnText, { fontFamily: colors.fontSemiBold }]}>
-                Choose a Later Time
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </ScrollView>
-  );
+
+    {/* Preparation Time Conflict Modal */}
+    <Modal
+      visible={conflictModal.visible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setConflictModal(prev => ({ ...prev, visible: false }))}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
+          {/* Warning icon + title */}
+          <View style={styles.modalTitleRow}>
+            <Text style={styles.modalWarningIcon}>⚠️</Text>
+            <Text style={[styles.modalTitle, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
+              Delivery Not Available
+            </Text>
+          </View>
+
+          <Text style={[styles.modalSubtitle, { color: colors.textMuted, fontFamily: colors.fontRegular }]}>
+            The following items need more preparation time and cannot be
+            delivered at your selected time:
+          </Text>
+
+          {/* Product list */}
+          {conflictModal.nonDeliverableProducts.map((p, i) => (
+            <View
+              key={i}
+              style={[styles.conflictItem, { borderColor: colors.borderSubtle, backgroundColor: colors.background || '#FAF6F2' }]}
+            >
+              <Text style={[styles.conflictProductName, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
+                {p.product_name}
+              </Text>
+              <View style={styles.conflictDetailRow}>
+                <Text style={[styles.conflictDetailLabel, { color: colors.textMuted }]}>Prep time:</Text>
+                <Text style={[styles.conflictDetailValue, { color: colors.darkBrown || colors.text, fontFamily: colors.fontSemiBold }]}>
+                  {p.preparation_time}
+                </Text>
+              </View>
+              <View style={styles.conflictDetailRow}>
+                <Text style={[styles.conflictDetailLabel, { color: colors.textMuted }]}>Earliest delivery:</Text>
+                <Text style={[styles.conflictDetailValue, { color: colors.primary, fontFamily: colors.fontSemiBold }]}>
+                  {p.earliest_delivery}
+                </Text>
+              </View>
+            </View>
+          ))}
+
+          {/* Divider */}
+          <View style={[styles.modalDivider, { backgroundColor: colors.borderSubtle }]} />
+
+          {/* Requested time */}
+          <View style={styles.conflictDetailRow}>
+            <Text style={[styles.conflictDetailLabel, { color: colors.textMuted }]}>Your selected time:</Text>
+            <Text style={[styles.conflictDetailValue, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
+              {conflictModal.requestedDelivery}
+            </Text>
+          </View>
+
+          {/* Suggestion */}
+          {!!conflictModal.suggestion && (
+            <Text style={[styles.modalSuggestion, { color: colors.primary, fontFamily: colors.fontRegular }]}>
+              💡 {conflictModal.suggestion}
+            </Text>
+          )}
+
+          {/* Action button */}
+          <TouchableOpacity
+            style={[styles.modalBtn, { backgroundColor: colors.primary }]}
+            onPress={() => setConflictModal(prev => ({ ...prev, visible: false }))}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.modalBtnText, { fontFamily: colors.fontSemiBold }]}>
+              Choose a Later Time
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  </View>
+);
 };
 
 const styles = StyleSheet.create({

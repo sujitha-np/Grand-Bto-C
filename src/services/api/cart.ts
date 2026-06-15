@@ -24,6 +24,7 @@ export interface Cart {
   total_amount: number;
   created_at: string;
   updated_at: string;
+  special_request?: string | null;
 }
 
 export interface CartResponse {

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -33,6 +35,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   const { t } = useTranslation();
   const colors = useTheme();
   const insets = useSafeAreaInsets();
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const [customerId, setCustomerId] = useState<string | undefined>(undefined);
   const [customerIdLoaded, setCustomerIdLoaded] = useState(false);
@@ -65,6 +68,18 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   const { mutate: removeFromCart } = useRemoveFromCart();
   const { mutate: saveSpecialRequest } = useSpecialRequest();
   const [refreshing, setRefreshing] = useState(false);
+  const [specialRequest, setSpecialRequest] = useState<string>('');
+
+  useEffect(() => {
+    if (cartResponse?.data) {
+      const cartSpecialRequest =
+        (cartResponse.data as any)?.cart?.special_request ||
+        (cartResponse.data as any)?.special_request;
+      if (cartSpecialRequest !== undefined && cartSpecialRequest !== null) {
+        setSpecialRequest(cartSpecialRequest);
+      }
+    }
+  }, [cartResponse]);
 
   useEffect(() => {
     if (cartResponse !== undefined) {
@@ -144,13 +159,17 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.white }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+    >
       {/* Header */}
       <Header
         title="Cart"
         onBack={onBack}
         containerStyle={{
-          backgroundColor: colors.white,
+          backgroundColor: colors.background,
           paddingBottom: sh(16),
           paddingTop: insets.top + sh(12),
         }}
@@ -172,9 +191,11 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
         </View>
       ) : (
         <ScrollView
+          ref={scrollViewRef}
           style={styles.content}
           contentContainerStyle={{ flexGrow: 1 }}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -214,13 +235,30 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
             <View style={styles.paddedContent}>
               <SpecialRequestSection
                 colors={colors}
+                specialRequest={specialRequest}
+                onAddPress={() => {
+                  setTimeout(() => {
+                    scrollViewRef.current?.scrollToEnd({ animated: true });
+                  }, 200);
+                }}
                 onSave={text => {
                   if (customerId && cartData?.cart_id) {
-                    saveSpecialRequest({
-                      cartId: String(cartData.cart_id),
-                      customerId,
-                      specialRequest: text,
-                    });
+                    saveSpecialRequest(
+                      {
+                        cartId: String(cartData.cart_id),
+                        customerId,
+                        specialRequest: text,
+                      },
+                      {
+                        onSuccess: (data) => {
+                          if (data.success && data.data?.special_request !== undefined) {
+                            setSpecialRequest(data.data.special_request || '');
+                          } else {
+                            setSpecialRequest(text);
+                          }
+                        },
+                      }
+                    );
                   }
                 }}
               />
@@ -246,13 +284,14 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
           style={[
             styles.footer,
             {
-              backgroundColor: colors.white,
+              backgroundColor: colors.card,
+              borderTopColor: colors.borderSubtle,
               paddingBottom: insets.bottom + sh(16),
             },
           ]}
         >
           <TouchableOpacity
-            style={[styles.outlineBtn, { borderColor: colors.border }]}
+            style={[styles.outlineBtn, { borderColor: colors.border, backgroundColor: colors.background }]}
             onPress={onBack}
           >
             <Text
@@ -285,7 +324,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
           </TouchableOpacity>
         </View>
       )}
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -340,7 +379,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: sw(20),
     paddingTop: sh(16),
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
     gap: sw(16),
   },
   outlineBtn: {
@@ -349,7 +387,6 @@ const styles = StyleSheet.create({
     borderRadius: sw(25),
     paddingVertical: sh(12),
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
   outlineBtnText: {
     fontSize: fs(14),

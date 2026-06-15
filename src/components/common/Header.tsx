@@ -25,7 +25,7 @@ function Header({
   const colors = useTheme();
 
   return (
-    <View style={[styles.header, containerStyle]}>
+    <View style={[styles.header, { backgroundColor: colors.background }, containerStyle]}>
       {showBackButton && onBack ? (
         <TouchableOpacity
           onPress={onBack}
@@ -61,7 +61,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: sw(20),
     paddingVertical: sh(12),
     gap: sw(14),
-    backgroundColor: '#FFFFFF',
   },
   backBtn: {
     width: sw(38),

@@ -28,6 +28,12 @@ export default function CouponSection({
 }: CouponSectionProps) {
   const [promoInput, setPromoInput] = useState(preFilledCode || '');
 
+  React.useEffect(() => {
+    if (preFilledCode) {
+      setPromoInput(preFilledCode);
+    }
+  }, [preFilledCode]);
+
   return (
     <View style={styles.container}>
       {/* Header row */}
@@ -54,7 +60,7 @@ export default function CouponSection({
           <Text
             style={[
               styles.viewAllText,
-              { color: colors.darkBrown, fontFamily: colors.fontRegular },
+              { color: colors.text, fontFamily: colors.fontRegular },
             ]}
           >
             View All
@@ -74,7 +80,7 @@ export default function CouponSection({
             styles.floatingLabel,
             {
               color: colors.textMuted,
-              backgroundColor: colors.white,
+              backgroundColor: colors.card,
               fontFamily: colors.fontRegular,
             },
           ]}

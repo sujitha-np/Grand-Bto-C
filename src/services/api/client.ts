@@ -1,6 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../constants/api';
+import { authEvents } from './authEvents';
 
 const apiClient = axios.create({
   baseURL: `${BASE_URL}/api`,
@@ -29,5 +30,16 @@ apiClient.interceptors.request.use(async config => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  response => response,
+  error => {
+    if (error.response && error.response.status === 401) {
+      console.log('Axios Interceptor - 401 Unauthorized detected!');
+      authEvents.emitUnauthorized();
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default apiClient;

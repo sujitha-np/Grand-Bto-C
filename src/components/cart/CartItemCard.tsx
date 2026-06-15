@@ -43,7 +43,7 @@ export default function CartItemCard({
         </View>
 
         <View style={styles.footerRow}>
-          <View style={[styles.quantityContainer, { borderColor: colors.offWhite }]}>
+          <View style={[styles.quantityContainer, { borderColor: colors.offWhite, backgroundColor: colors.background }]}>
             <TouchableOpacity onPress={onDecrease} style={styles.qtyBtn}>
               <Text style={[styles.qtyControlText, { color: colors.lightBrown }]}>-</Text>
             </TouchableOpacity>
@@ -56,7 +56,7 @@ export default function CartItemCard({
           </View>
 
           <Text style={[styles.price, { color: colors.text, fontFamily: colors.fontSemiBold }]}>
-            {parseFloat(item.price) * parseInt(item.quantity)} QAR
+            {(parseFloat(item.price) * parseInt(item.quantity)).toFixed(2)} QAR
           </Text>
         </View>
       </View>
@@ -113,7 +113,6 @@ const styles = StyleSheet.create({
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
     borderRadius: sw(20),
     paddingHorizontal: sw(8),
     paddingVertical: sh(4),

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Image,
   ScrollView,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
-  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -34,11 +33,11 @@ function ProductDetailScreen({
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [quantity, setQuantity] = useState(1);
-  const [showSpecialRequest, setShowSpecialRequest] = useState(false);
-  const [specialRequestText, setSpecialRequestText] = useState('');
   const [selectedAddons, setSelectedAddons] = useState<number[]>([]);
   const { data: addonsData, isLoading: addonsLoading } = useAddons();
   const addons = addonsData?.data || [];
+
+  const scrollViewRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     console.log('Addons Data:', addonsData);
@@ -60,7 +59,11 @@ function ProductDetailScreen({
   const ingredientsCount = ingredientsArray.length;
 
   const calculateTotalPrice = () => {
-    const basePrice = parseFloat(product.net_price) * quantity;
+    const hasOffer = product.offer != null && product.offer.offer_price != null && product.offer.offer_price !== '';
+    const offerPrice = hasOffer ? product.offer!.offer_price : (product.offer_price || '');
+    const activeUnitPrice = (offerPrice !== '') ? parseFloat(offerPrice) : parseFloat(product.net_price || product.price || '0');
+
+    const basePrice = activeUnitPrice * quantity;
     const addonsPrice = addons
       .filter(addon => selectedAddons.includes(addon.id))
       .reduce((sum, addon) => sum + parseFloat(addon.offer_price), 0);
@@ -101,48 +104,51 @@ function ProductDetailScreen({
 
   return (
     <View style={styles.container}>
-      {/* Product Image with Header */}
-      <View style={styles.imageContainer}>
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.productImage}
-          resizeMode="cover"
-        />
-        <View style={styles.imageOverlay}>
-          <TouchableOpacity
-            style={[styles.backButton, { backgroundColor: colors.white }]}
-            onPress={onBack}
-          >
-            <Image
-              source={Images.backArrow1}
-              style={styles.backIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.shareButton, { backgroundColor: colors.white }]}
-          >
-            <Image
-              source={Images.share}
-              style={styles.shareIcon}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <ScrollView
-        style={styles.content}
+        ref={scrollViewRef}
+        style={styles.scrollView}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Department Label */}
-        <Text
-          style={[
-            styles.departmentLabel,
-            { color: colors.textMuted, fontFamily: colors.fontRegular },
-          ]}
-        >
+        {/* Product Image with Header */}
+        <View style={styles.imageContainer}>
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+          <View style={styles.imageOverlay}>
+            <TouchableOpacity
+              style={[styles.backButton, { backgroundColor: colors.card }]}
+              onPress={onBack}
+            >
+              <Image
+                source={Images.backArrow1}
+                style={styles.backIcon}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.shareButton, { backgroundColor: colors.card }]}
+            >
+              <Image
+                source={Images.share}
+                style={styles.shareIcon}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.contentWrapper}>
+          {/* Department Label */}
+          <Text
+            style={[
+              styles.departmentLabel,
+              { color: colors.textMuted, fontFamily: colors.fontRegular },
+            ]}
+          >
           {product.department?.name_en || product.department_info?.name_en}
         </Text>
 
@@ -302,7 +308,7 @@ function ProductDetailScreen({
                         : colors.border,
                     },
                     selectedAddons.includes(addon.id) && {
-                      backgroundColor: colors.white,
+                      backgroundColor: colors.card,
                     },
                   ]}
                 >
@@ -333,59 +339,7 @@ function ProductDetailScreen({
           )}
         </View>
 
-        {/* Special Request */}
-        <View style={styles.section}>
-          <View style={styles.specialRequestHeader}>
-            <Image
-              source={Images.chatBubble}
-              style={styles.specialRequestIcon}
-              resizeMode="contain"
-            />
-            <Text
-              style={[
-                styles.specialRequestTitle,
-                { color: colors.text, fontFamily: colors.fontMedium },
-              ]}
-            >
-              Any special request
-            </Text>
-          </View>
-          {!showSpecialRequest ? (
-            <TouchableOpacity
-              style={[styles.addSpecialButton, { borderColor: colors.border }]}
-              onPress={() => setShowSpecialRequest(true)}
-            >
-              <Text
-                style={[
-                  styles.addSpecialText,
-                  { color: colors.textMuted, fontFamily: colors.fontRegular },
-                ]}
-              >
-                Add+
-              </Text>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[
-                  styles.specialRequestInput,
-                  {
-                    borderColor: colors.border,
-                    color: colors.text,
-                    fontFamily: colors.fontRegular,
-                  },
-                ]}
-                placeholder="Enter your special request here..."
-                placeholderTextColor={colors.textMuted}
-                value={specialRequestText}
-                onChangeText={setSpecialRequestText}
-                multiline
-                numberOfLines={3}
-                textAlignVertical="top"
-                autoFocus
-              />
-            </View>
-          )}
+
         </View>
       </ScrollView>
 
@@ -394,7 +348,7 @@ function ProductDetailScreen({
         style={[
           styles.fixedBottomContainer,
           {
-            backgroundColor: colors.white,
+            backgroundColor: colors.card,
             paddingBottom: insets.bottom,
             borderTopColor: colors.border,
           },
@@ -508,20 +462,26 @@ const createStyles = (colors: any, insets: any) =>
       shadowOpacity: 0.1,
       shadowRadius: 4,
       elevation: 3,
+      backgroundColor: colors.card,
     },
     shareIcon: {
       width: sw(20),
       height: sw(20),
     },
-    content: {
+    scrollView: {
       flex: 1,
-      backgroundColor: colors.white,
-      marginTop: sh(-20),
+      backgroundColor: colors.background,
     },
     scrollContent: {
+      paddingBottom: sh(20),
+    },
+    contentWrapper: {
       paddingHorizontal: sw(20),
       paddingTop: sh(20),
-      paddingBottom: sh(120), // Add extra padding for fixed bottom button
+      marginTop: sh(-20),
+      backgroundColor: colors.background,
+      borderTopLeftRadius: sw(24),
+      borderTopRightRadius: sw(24),
     },
     departmentLabel: {
       fontSize: fs(14),
@@ -692,45 +652,8 @@ const createStyles = (colors: any, insets: any) =>
       lineHeight: fs(20),
       marginBottom: sh(4),
     },
-    specialRequestHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: sh(12),
-    },
-    specialRequestIcon: {
-      width: sw(20),
-      height: sw(20),
-      marginRight: sw(8),
-    },
-    specialRequestTitle: {
-      fontSize: fs(15),
-    },
-    addSpecialButton: {
-      paddingVertical: sh(10),
-      paddingHorizontal: sw(20),
-      borderRadius: sw(20),
-      borderWidth: 1,
-      alignSelf: 'flex-start',
-    },
-    addSpecialText: {
-      fontSize: fs(14),
-    },
-    inputContainer: {
-      marginTop: sh(12),
-    },
-    specialRequestInput: {
-      borderWidth: 1,
-      borderRadius: sw(12),
-      paddingHorizontal: sw(16),
-      paddingVertical: sh(12),
-      fontSize: fs(14),
-      minHeight: sh(100),
-    },
+
     fixedBottomContainer: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
       paddingTop: sh(16),
       paddingHorizontal: sw(20),
       borderTopWidth: 1,

@@ -54,7 +54,7 @@ function AccountScreen({
 
   // Fetch loyalty points
   const { data: loyaltyData } = useLoyaltyPoints(customerId);
-  const loyaltyPoints = loyaltyData?.data?.points || 0;
+  const loyaltyPoints = loyaltyData?.data?.total_loyalty_points || 0;
 
   // Fetch promocodes
   const { data: promocodeData } = usePromocodes();
@@ -103,6 +103,7 @@ function AccountScreen({
   const handleLogout = async () => {
     try {
       await AsyncStorage.removeItem('customerId');
+      await AsyncStorage.removeItem('userToken');
       onLogout();
     } catch (e) {
       console.error('Logout error', e);
@@ -252,7 +253,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(48),
       height: sw(48),
       borderRadius: sw(24),
-      backgroundColor: '#fff', // fallback
+      backgroundColor: colors.card,
       overflow: 'hidden',
       justifyContent: 'center',
       alignItems: 'center',
@@ -263,7 +264,7 @@ const createStyles = (colors: any, insets: any) =>
     },
     profileName: {
       fontSize: fs(20),
-      color: '#3B2B20',
+      color: colors.darkBrown,
       marginLeft: sw(12),
       fontFamily: 'Manrope-Medium',
     },
@@ -271,7 +272,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(40),
       height: sw(40),
       borderRadius: sw(20),
-      backgroundColor: 'white',
+      backgroundColor: colors.card,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -286,7 +287,7 @@ const createStyles = (colors: any, insets: any) =>
       justifyContent: 'space-between',
     },
     statCard: {
-      backgroundColor: 'white',
+      backgroundColor: colors.card,
       borderRadius: sw(16),
       flex: 1,
       flexDirection: 'row',
@@ -320,7 +321,7 @@ const createStyles = (colors: any, insets: any) =>
     },
     statValueNumber: {
       fontSize: fs(16),
-      color: '#3B2B20',
+      color: colors.darkBrown,
       fontFamily: 'Manrope-Bold',
     },
     statValueText: {
@@ -347,7 +348,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(22),
       height: sw(22),
       marginRight: sw(24), // increase spacing from text
-      tintColor: '#3B2B20',
+      tintColor: colors.darkBrown,
     },
     menuTitle: {
       fontSize: fs(14),

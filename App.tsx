@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  BackHandler,
   I18nManager,
   Image,
   ImageSourcePropType,
@@ -42,11 +43,28 @@ import CouponScreen from './src/screens/CouponScreen';
 import PromoCodesScreen from './src/screens/PromoCodesScreen';
 import { SavedAddress } from './src/services/api/address';
 import { Product } from './src/services/api/product';
+import { cartService } from './src/services/api/cart';
 import { useTheme } from './src/hooks/useTheme';
-import { useAddToCart } from './src/hooks/queries';
+import { useAddToCart, useProducts } from './src/hooks/queries';
 import { fs, sw, sh } from './src/utils/responsive';
 import Toast, { BaseToast, ErrorToast } from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { authEvents } from './src/services/api/authEvents';
+
+// Wrap global fetch to intercept 401 Unauthorized responses
+const originalFetch = (globalThis as any).fetch;
+(globalThis as any).fetch = async (input: any, init?: any) => {
+  try {
+    const response = await originalFetch(input, init);
+    if (response && response.status === 401) {
+      console.log('Global Fetch Interceptor - 401 Unauthorized detected!');
+      authEvents.emitUnauthorized();
+    }
+    return response;
+  } catch (error) {
+    throw error;
+  }
+};
 
 const toastConfig = {
   success: (props: any) => (
@@ -55,6 +73,7 @@ const toastConfig = {
       style={{ borderLeftColor: '#FF7B00' }}
       contentContainerStyle={{ paddingHorizontal: 15 }}
       text1Style={{ fontSize: 16, fontWeight: '600' }}
+      text1NumberOfLines={0}
       text2Style={{ fontSize: 14 }}
       text2NumberOfLines={0}
     />
@@ -65,6 +84,7 @@ const toastConfig = {
       style={{ borderLeftColor: '#FF0000' }}
       contentContainerStyle={{ paddingHorizontal: 15 }}
       text1Style={{ fontSize: 16, fontWeight: '600' }}
+      text1NumberOfLines={0}
       text2Style={{ fontSize: 14 }}
       text2NumberOfLines={0}
     />
@@ -107,6 +127,20 @@ function AppContent() {
   const [customerId, setCustomerId] = useState<number | null>(null);
 
   useEffect(() => {
+    const unsubscribe = authEvents.subscribe(() => {
+      setCustomerId(null);
+      setScreen('welcome');
+      queryClient.clear();
+      Toast.show({
+        type: 'error',
+        text1: 'Session Expired',
+        text2: 'Please log in again.',
+      });
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
     const currentLanguage = store.getState().language.current;
     const isRTL = currentLanguage === 'ar';
     I18nManager.forceRTL(isRTL);
@@ -124,6 +158,27 @@ function AppContent() {
     };
     checkAuthStatus();
   }, []);
+
+  useEffect(() => {
+    const handleBackPress = () => {
+      if (screen === 'settings' || screen === 'register' || screen === 'login') {
+        setScreen('welcome');
+        return true;
+      }
+      if (screen === 'otp') {
+        setScreen('login');
+        return true;
+      }
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBackPress
+    );
+
+    return () => subscription.remove();
+  }, [screen]);
 
   if (screen === 'splash') {
     return <SplashScreen onGetStarted={() => setScreen('welcome')} />;
@@ -167,8 +222,12 @@ function AppContent() {
   if (screen === 'home') {
     return (
       <MainApp
+        customerId={customerId}
         onLogout={() => {
+          AsyncStorage.removeItem('customerId');
+          AsyncStorage.removeItem('userToken');
           setCustomerId(null);
+          queryClient.clear();
           setScreen('welcome');
         }}
       />
@@ -186,11 +245,12 @@ function AppContent() {
 
 type Tab = 'home' | 'orders' | 'account';
 
-function MainApp({ onLogout }: { onLogout: () => void }) {
+function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: number | null }) {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [subScreen, setSubScreen] = useState<string | null>(null);
   const [cartTotal, setCartTotal] = useState<number>(0);
   const [selectedDeliveryDate, setSelectedDeliveryDate] = useState<string>('');
+  const [ordersSelectedDate, setOrdersSelectedDate] = useState<string | undefined>(undefined);
   const [editAddress, setEditAddress] = useState<SavedAddress | undefined>();
   const [selectedAddress, setSelectedAddress] = useState<
     SavedAddress | undefined
@@ -206,6 +266,73 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
   const { t } = useTranslation();
   const colors = useTheme();
   const { mutateAsync: addToCart } = useAddToCart();
+  const { data: allProductsData } = useProducts();
+
+  useEffect(() => {
+    const handleBackPress = () => {
+      if (
+        subScreen === 'accountInfo' ||
+        subScreen === 'settings' ||
+        subScreen === 'feedback' ||
+        subScreen === 'orderHistory' ||
+        subScreen === 'loyaltyPoints' ||
+        subScreen === 'wishlist' ||
+        subScreen === 'cart'
+      ) {
+        setSubScreen(null);
+        return true;
+      }
+      if (subScreen === 'offeredProducts') {
+        setSelectedOffer(null);
+        setSubScreen(null);
+        return true;
+      }
+      if (subScreen === 'coupons') {
+        setSubScreen(null);
+        return true;
+      }
+      if (subScreen === 'promoCodes') {
+        setSubScreen('checkout');
+        return true;
+      }
+      if (subScreen === 'productDetail') {
+        setSelectedProduct(null);
+        setSubScreen(null);
+        return true;
+      }
+      if (subScreen === 'calendar') {
+        setSubScreen('cart');
+        return true;
+      }
+      if (subScreen === 'savedAddress') {
+        setSubScreen('calendar');
+        return true;
+      }
+      if (subScreen === 'newAddress') {
+        setEditAddress(undefined);
+        setSubScreen('savedAddress');
+        return true;
+      }
+      if (subScreen === 'checkout') {
+        setSubScreen('savedAddress');
+        return true;
+      }
+
+      if (subScreen === null && activeTab !== 'home') {
+        setActiveTab('home');
+        return true;
+      }
+
+      return false;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBackPress
+    );
+
+    return () => subscription.remove();
+  }, [subScreen, selectedAddress, activeTab]);
 
   if (subScreen === 'accountInfo') {
     return <AccountInfoScreen onBack={() => setSubScreen(null)} />;
@@ -250,17 +377,26 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
       <WishlistScreen
         onBack={() => setSubScreen(null)}
         onShowProductDetail={productId => {
-          // We need to fetch the product, but for now we can navigate with just the ID
-          // You might need to create a product object or modify ProductDetailScreen
-          setSubScreen(null);
+          const products =
+            allProductsData?.products || allProductsData?.data || [];
+          const matchedProduct = products.find((p: any) => p.id === productId);
+          if (matchedProduct) {
+            setSelectedProduct(matchedProduct);
+            setSubScreen('productDetail');
+          } else {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: 'Product details not found',
+            });
+          }
         }}
       />
     );
   }
 
   if (subScreen === 'coupons') {
-    const couponsBackScreen = selectedAddress ? 'checkout' : null;
-    return <CouponScreen onBack={() => setSubScreen(couponsBackScreen)} />;
+    return <CouponScreen onBack={() => setSubScreen(null)} />;
   }
 
   if (subScreen === 'promoCodes') {
@@ -283,13 +419,12 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
           setSelectedProduct(null);
           setSubScreen(null);
         }}
-        onAddToCart={async (productId, quantity) => {
-          const customerId = await AsyncStorage.getItem('customerId');
+        onAddToCart={async (productId: number, quantity: number) => {
           if (customerId) {
             const today = new Date().toISOString().split('T')[0];
             try {
               await addToCart({
-                customerId,
+                customerId: String(customerId),
                 productId: productId.toString(),
                 quantity: quantity.toString(),
                 preorderDate: today,
@@ -320,6 +455,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
         onBack={() => setSubScreen('cart')}
         totalAmount={cartTotal}
         cartId={cartIdForCheckout}
+        customerId={customerId ? String(customerId) : undefined}
         onCheckout={selectedDate => {
           setSelectedDeliveryDate(selectedDate);
           setSubScreen('savedAddress');
@@ -384,7 +520,14 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
         preorderDate={selectedDeliveryDate}
         onViewAllPromos={() => setSubScreen('promoCodes')}
         preFilledPromoCode={selectedPromoCode}
-        onOrderPlaced={() => {
+        onGoToHome={() => {
+          setSubScreen(null);
+          setActiveTab('home');
+        }}
+        onGoToOrders={(preorderDate) => {
+          if (preorderDate) {
+            setOrdersSelectedDate(preorderDate);
+          }
           setSubScreen(null);
           setActiveTab('orders');
         }}
@@ -422,7 +565,12 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
             onShowWishlist={() => setSubScreen('wishlist')}
           />
         )}
-        {activeTab === 'orders' && <OrdersScreen />}
+        {activeTab === 'orders' && (
+          <OrdersScreen
+            initialDate={ordersSelectedDate}
+            onClearInitialDate={() => setOrdersSelectedDate(undefined)}
+          />
+        )}
         {activeTab === 'account' && (
           <AccountScreen
             onLogout={onLogout}
@@ -444,7 +592,7 @@ function MainApp({ onLogout }: { onLogout: () => void }) {
         style={[
           styles.tabBar,
           {
-            backgroundColor: 'white',
+            backgroundColor: colors.card,
             paddingBottom: insets.bottom,
             borderTopColor: colors.borderSubtle,
           },

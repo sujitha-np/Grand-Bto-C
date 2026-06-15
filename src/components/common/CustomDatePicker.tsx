@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
@@ -10,6 +10,7 @@ interface CustomDatePickerProps {
   mode?: 'dob' | 'any'; // 'dob' for date of birth with 18+ restriction, 'any' for any date
   minDate?: Date; // Optional minimum date
   maxDate?: Date; // Optional maximum date
+  selectedDate?: string; // Currently selected date (YYYY-MM-DD)
 }
 
 const MONTHS = [
@@ -35,27 +36,45 @@ export default function CustomDatePicker({
   mode = 'dob',
   minDate,
   maxDate: customMaxDate,
+  selectedDate,
 }: CustomDatePickerProps) {
   const colors = useTheme();
 
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
 
-  // For DOB mode, default to 18+ years restriction
+  // For DOB mode, allow any date up to today (removing the 18+ restriction)
   const maxDate =
     mode === 'dob'
-      ? new Date(today.getFullYear() - 18, today.getMonth(), today.getDate())
+      ? today
       : customMaxDate || new Date(today.getFullYear() + 1, 11, 31); // Allow up to next year for orders
 
   const minDateRestriction =
     mode === 'dob'
-      ? new Date(today.getFullYear() - 100, 0, 1) // 100 years ago for DOB
+      ? new Date(today.getFullYear() - 120, 0, 1) // 120 years ago for DOB
       : minDate || new Date(1900, 0, 1); // Allow past dates for order history when no minDate specified
 
-  // Default to 20 years ago for DOB, or today for other modes
-  const [currentDate, setCurrentDate] = useState(
-    mode === 'dob' ? new Date(today.getFullYear() - 20, 0, 1) : new Date(),
-  );
+  // Default to today for all modes
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  useEffect(() => {
+    if (visible) {
+      if (selectedDate) {
+        const parts = selectedDate.split('-');
+        if (parts.length === 3) {
+          const yearPart = parseInt(parts[0], 10);
+          const monthPart = parseInt(parts[1], 10) - 1;
+          const dayPart = parseInt(parts[2], 10);
+          const parsed = new Date(yearPart, monthPart, dayPart);
+          if (!isNaN(parsed.getTime())) {
+            setCurrentDate(parsed);
+            return;
+          }
+        }
+      }
+      setCurrentDate(new Date());
+    }
+  }, [visible, selectedDate]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -93,6 +112,18 @@ export default function CustomDatePicker({
     const date = new Date(year, month, d);
     date.setHours(0, 0, 0, 0);
     return date.getTime() === today.getTime();
+  };
+
+  const isSelected = (d: number) => {
+    if (!selectedDate) return false;
+    const parts = selectedDate.split('-');
+    if (parts.length === 3) {
+      const yearPart = parseInt(parts[0], 10);
+      const monthPart = parseInt(parts[1], 10) - 1;
+      const dayPart = parseInt(parts[2], 10);
+      return year === yearPart && month === monthPart && d === dayPart;
+    }
+    return false;
   };
 
   const isNextMonthDisabled = () => {
@@ -211,31 +242,53 @@ export default function CustomDatePicker({
           </View>
 
           <View style={styles.daysGrid}>
-            {days.map((day, index) => (
-              <View key={index} style={styles.dayCell}>
-                {day !== null && (
+            {days.map((day, index) => {
+              if (day === null) {
+                return <View key={index} style={styles.dayCell} />;
+              }
+
+              const selected = isSelected(day);
+              const disabled = isDayDisabled(day);
+              const todayFlag = isToday(day);
+
+              return (
+                <View key={index} style={styles.dayCell}>
                   <TouchableOpacity
                     style={[
                       styles.dayButton,
-                      isToday(day) && styles.todayButton,
-                      isDayDisabled(day) && { opacity: 0.3 },
+                      todayFlag && {
+                        borderWidth: 1.5,
+                        borderColor: colors.primary,
+                      },
+                      selected && {
+                        backgroundColor: colors.primary,
+                        borderWidth: 0,
+                      },
+                      disabled && { opacity: 0.3 },
                     ]}
                     onPress={() => handleDayPress(day)}
-                    disabled={isDayDisabled(day)}
+                    disabled={disabled}
                   >
                     <Text
                       style={[
                         styles.dayText,
                         { color: colors.text },
-                        isToday(day) && styles.todayText,
+                        todayFlag && {
+                          color: colors.primary,
+                          fontFamily: 'Inter-Bold',
+                        },
+                        selected && {
+                          color: '#FFFFFF',
+                          fontFamily: 'Inter-Bold',
+                        },
                       ]}
                     >
                       {day}
                     </Text>
                   </TouchableOpacity>
-                )}
-              </View>
-            ))}
+                </View>
+              );
+            })}
           </View>
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
@@ -258,7 +311,7 @@ const styles = StyleSheet.create({
     zIndex: 9999,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 1,
   },
   container: {

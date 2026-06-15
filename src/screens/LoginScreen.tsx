@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -6,8 +6,8 @@ import {
   StatusBar,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -34,6 +34,26 @@ function LoginScreen({ onBack, onLogin }: LoginScreenProps) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const styles = React.useMemo(
     () => createStyles(colors, insets),
@@ -83,7 +103,11 @@ function LoginScreen({ onBack, onLogin }: LoginScreenProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
       <StatusBar
         barStyle={colors.statusBar}
         backgroundColor={colors.background}
@@ -91,75 +115,73 @@ function LoginScreen({ onBack, onLogin }: LoginScreenProps) {
 
       <Header title={t('login.title')} onBack={onBack} />
 
-      <KeyboardAvoidingView
+      <ScrollView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        contentContainerStyle={[
+          styles.scrollContent,
+          keyboardHeight > 0 && { paddingBottom: keyboardHeight + sh(40) }
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.pageTitle}>{t('login.enterDetails')}</Text>
+        <Text style={styles.pageTitle}>{t('login.enterDetails')}</Text>
 
-          <InputField
-            label={t('login.email')}
-            placeholder={t('login.emailPlaceholder')}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            leftIcon={Images.mail}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
+        <InputField
+          label={t('login.email')}
+          placeholder={t('login.emailPlaceholder')}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          leftIcon={Images.mail}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+        />
+
+        {/* Or divider */}
+        <View style={styles.orContainer}>
+          <View style={styles.orLine} />
+          <Text style={styles.orText}>{t('login.or')}</Text>
+          <View style={styles.orLine} />
+        </View>
+
+        <InputField
+          maxLength={8}
+          label={t('login.phone')}
+          placeholder={t('login.phonePlaceholder')}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          leftIcon={Images.call}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+        />
+
+        <InputField
+          label={t('login.password')}
+          placeholder={t('login.passwordPlaceholder')}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          leftIcon={Images.password}
+          rightIcon={Images.eye}
+          onRightIconPress={() => setShowPassword(v => !v)}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+        />
+
+        {/* Continue button */}
+        <View style={styles.btnContainer}>
+          <Button
+            label={t('login.continue')}
+            onPress={handleLogin}
+            loading={loading}
+            variant="primary"
           />
-
-          {/* Or divider */}
-          <View style={styles.orContainer}>
-            <View style={styles.orLine} />
-            <Text style={styles.orText}>{t('login.or')}</Text>
-            <View style={styles.orLine} />
-          </View>
-
-          <InputField
-            maxLength={8}
-            label={t('login.phone')}
-            placeholder={t('login.phonePlaceholder')}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            leftIcon={Images.call}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
-          />
-
-          <InputField
-            label={t('login.password')}
-            placeholder={t('login.passwordPlaceholder')}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            leftIcon={Images.password}
-            rightIcon={Images.eye}
-            onRightIconPress={() => setShowPassword(v => !v)}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
-          />
-
-          {/* Continue button */}
-          <View style={styles.btnContainer}>
-            <Button
-              label={t('login.continue')}
-              onPress={handleLogin}
-              loading={loading}
-              variant="primary"
-            />
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -177,7 +199,7 @@ const createStyles = (colors: any, insets: any) =>
     scrollContent: {
       paddingHorizontal: sw(20),
       paddingTop: sh(4),
-      paddingBottom: sh(16),
+      paddingBottom: sh(40),
     },
     pageTitle: {
       fontSize: fs(32),

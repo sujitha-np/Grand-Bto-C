@@ -10,6 +10,7 @@ import {
   View,
   KeyboardAvoidingView,
   Platform,
+  Keyboard,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -75,6 +76,26 @@ function NewAddressScreen({
   const [name, setName] = useState('');
   const [additionalDirections, setAdditionalDirections] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   // Load customer ID
   useEffect(() => {
@@ -282,7 +303,10 @@ function NewAddressScreen({
 
       <ScrollView
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={[
+          styles.contentContainer,
+          keyboardHeight > 0 && { paddingBottom: keyboardHeight + sh(40) }
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -520,6 +544,7 @@ function NewAddressScreen({
               }
             }}
             keyboardType="phone-pad"
+            maxLength={8}
           />
           {errors.phoneNumber ? (
             <Text style={styles.errorText}>{errors.phoneNumber}</Text>
@@ -579,19 +604,19 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
       paddingTop: insets.top + sh(8),
     },
     headerRow: {
       position: 'relative',
       justifyContent: 'center',
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
     },
     header: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
     },
     headerContainer: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
       paddingRight: sw(100),
     },
     addButton: {
@@ -606,7 +631,7 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.white,
+      backgroundColor: colors.background,
     },
     addButtonText: {
       color: colors.text,
@@ -635,8 +660,8 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       paddingHorizontal: sw(12),
       borderRadius: sw(25),
       borderWidth: 1,
-      borderColor: '#E0E0E0',
-      backgroundColor: colors.white,
+      borderColor: colors.borderSubtle,
+      backgroundColor: colors.card,
       gap: sw(6),
     },
     typeToggleActive: {
@@ -667,7 +692,6 @@ const createStyles = (colors: any, insets: { top: number; bottom: number }) =>
       fontSize: fs(12),
       color: colors.text,
       fontFamily: colors.fontRegular,
-      backgroundColor: colors.white,
     },
     rowFieldsContainer: {
       flexDirection: 'row',

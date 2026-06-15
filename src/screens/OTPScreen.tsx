@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,6 +8,7 @@ import {
   Text,
   TextInput,
   View,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,26 @@ function OTPScreen({ onBack, onContinue, customerId }: OTPScreenProps) {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [loading, setLoading] = useState(false);
   const inputRefs = useRef<(TextInput | null)[]>([]);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const handleChange = (text: string, index: number) => {
     const cleanText = text.replace(/[^0-9]/g, '');
@@ -140,7 +161,11 @@ function OTPScreen({ onBack, onContinue, customerId }: OTPScreenProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
       <StatusBar
         barStyle={colors.statusBar}
         backgroundColor={colors.background}
@@ -148,56 +173,54 @@ function OTPScreen({ onBack, onContinue, customerId }: OTPScreenProps) {
 
       <Header title={t('otp.title')} onBack={onBack} />
 
-      <KeyboardAvoidingView
+      <ScrollView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        contentContainerStyle={[
+          styles.scrollContent,
+          keyboardHeight > 0 && { paddingBottom: keyboardHeight + sh(40) }
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.pageTitle}>{t('otp.enterCode')}</Text>
+        <Text style={styles.pageTitle}>{t('otp.enterCode')}</Text>
 
-          <Text style={styles.label}>{t('otp.otp')}</Text>
+        <Text style={styles.label}>{t('otp.otp')}</Text>
 
-          <View style={styles.otpWrapper}>
-            {otp.map((digit, index) => (
-              <React.Fragment key={index}>
-                {index > 0 && <View style={styles.divider} />}
-                <TextInput
-                  ref={ref => {
-                    inputRefs.current[index] = ref;
-                  }}
-                  style={styles.otpInput}
-                  value={digit}
-                  onChangeText={text => handleChange(text, index)}
-                  onKeyPress={e => handleKeyPress(e, index)}
-                  keyboardType="numeric"
-                  textContentType="oneTimeCode"
-                  maxLength={6}
-                  textAlign="center"
-                  placeholder="0"
-                  placeholderTextColor={colors.textPlaceholder}
-                  selectionColor={colors.primary}
-                />
-              </React.Fragment>
-            ))}
-          </View>
-        </ScrollView>
-
-        {/* Sticky Continue button at bottom */}
-        <View style={styles.btnContainer}>
-          <Button
-            label={t('otp.continue')}
-            onPress={handleVerify}
-            loading={loading}
-            variant="primary"
-          />
+        <View style={styles.otpWrapper}>
+          {otp.map((digit, index) => (
+            <React.Fragment key={index}>
+              {index > 0 && <View style={styles.divider} />}
+              <TextInput
+                ref={ref => {
+                  inputRefs.current[index] = ref;
+                }}
+                style={styles.otpInput}
+                value={digit}
+                onChangeText={text => handleChange(text, index)}
+                onKeyPress={e => handleKeyPress(e, index)}
+                keyboardType="numeric"
+                textContentType="oneTimeCode"
+                maxLength={6}
+                textAlign="center"
+                placeholder="0"
+                placeholderTextColor={colors.textPlaceholder}
+                selectionColor={colors.primary}
+              />
+            </React.Fragment>
+          ))}
         </View>
-      </KeyboardAvoidingView>
-    </View>
+      </ScrollView>
+
+      {/* Sticky Continue button at bottom */}
+      <View style={styles.btnContainer}>
+        <Button
+          label={t('otp.continue')}
+          onPress={handleVerify}
+          loading={loading}
+          variant="primary"
+        />
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 

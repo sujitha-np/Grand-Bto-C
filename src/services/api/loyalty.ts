@@ -4,11 +4,22 @@ import { BASE_URL } from '../../constants/api';
 export interface PointHistory {
   id: number;
   customer_id: number;
-  points: number;
-  type: string; // 'credit' or 'debit'
-  description: string;
+  order_id?: number;
+  order_amount?: string;
+  points_earned: number;
+  is_qualified?: number;
+  is_expired?: number;
+  expired_at?: string | null;
+  transaction_type?: string;
+  notes: string;
   created_at: string;
-  formatted_date: string;
+  updated_at?: string;
+  deleted_at?: string | null;
+  order?: {
+    id: number;
+    unique_id?: string;
+    [key: string]: any;
+  } | null;
 }
 
 export interface LoyaltyPointsResponse {

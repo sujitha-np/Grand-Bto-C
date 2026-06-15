@@ -49,8 +49,15 @@ function OfferedProductsScreen({
     getCustomerId();
   }, []);
 
-  const handleProductPress = (product: Product) => {
-    onShowProductDetail(product);
+  const handleProductPress = (product: Product, offerPrice: string) => {
+    onShowProductDetail({
+      ...product,
+      offer_price: offerPrice,
+      offer: {
+        ...(product.offer || {}),
+        offer_price: offerPrice,
+      },
+    } as any);
   };
 
   const handleAddToCart = async (product: Product, offerPrice: string) => {
@@ -91,7 +98,7 @@ function OfferedProductsScreen({
       <TouchableOpacity
         style={styles.productCard}
         activeOpacity={0.8}
-        onPress={() => handleProductPress(product)}
+        onPress={() => handleProductPress(product, item.offer_price)}
       >
         <Image
           source={{ uri: `${BASE_URL}${product.image}` }}

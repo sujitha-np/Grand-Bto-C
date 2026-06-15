@@ -199,7 +199,10 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: getStatusBgColor('completed') },
+                {
+                  borderColor: getStatusColor('completed'),
+                  backgroundColor: getStatusBgColor('completed'),
+                },
               ]}
             >
               <Text
@@ -216,7 +219,10 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
             <View
               style={[
                 styles.statusBadge,
-                { backgroundColor: getStatusBgColor('cancelled') },
+                {
+                  borderColor: getStatusColor('cancelled'),
+                  backgroundColor: getStatusBgColor('cancelled'),
+                },
               ]}
             >
               <Text
@@ -305,6 +311,7 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
           setShowCalendar(false);
         }}
         mode="any"
+        selectedDate={selectedDate}
       />
 
       {/* Filter Tabs */}
@@ -369,7 +376,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(40),
       height: sw(40),
       borderRadius: sw(20),
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
       justifyContent: 'center',
       alignItems: 'center',
       shadowColor: '#000',
@@ -418,7 +425,7 @@ const createStyles = (colors: any, insets: any) =>
       borderRadius: sw(20),
       borderWidth: 1,
       borderColor: colors.border,
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
     },
     filterTabActive: {
       backgroundColor: colors.primary,
@@ -449,7 +456,7 @@ const createStyles = (colors: any, insets: any) =>
       marginBottom: sh(12),
     },
     orderCard: {
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
       borderRadius: sw(12),
       padding: sw(16),
       marginBottom: sh(12),

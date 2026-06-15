@@ -31,7 +31,7 @@ export const authService = {
         if (attempt > 0) {
           console.log(`Register - Retry attempt ${attempt}/${MAX_RETRIES}`);
           // Exponential backoff: 1s, 2s
-          await new Promise(resolve =>
+          await new Promise<void>(resolve =>
             setTimeout(resolve, attempt * 1000),
           );
         }

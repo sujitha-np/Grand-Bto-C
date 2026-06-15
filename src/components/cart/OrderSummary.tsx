@@ -48,7 +48,7 @@ export default function OrderSummary({
             { color: colors.text, fontFamily: colors.fontRegular },
           ]}
         >
-          {subtotal} QAR
+          {subtotal.toFixed(2)} QAR
         </Text>
       </View>
 
@@ -67,7 +67,7 @@ export default function OrderSummary({
             { color: colors.text, fontFamily: colors.fontRegular },
           ]}
         >
-          {delivery} QAR
+          {delivery.toFixed(2)} QAR
         </Text>
       </View>
     </View>

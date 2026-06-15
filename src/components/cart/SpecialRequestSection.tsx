@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,29 +12,36 @@ import { Images } from '../../assets/images';
 
 interface SpecialRequestSectionProps {
   colors: any;
+  specialRequest?: string;
   onAddPress?: () => void;
   onSave?: (text: string) => void;
 }
 
 export default function SpecialRequestSection({
   colors,
+  specialRequest = '',
   onAddPress,
   onSave,
 }: SpecialRequestSectionProps) {
   const [showInput, setShowInput] = useState(false);
-  const [requestText, setRequestText] = useState('');
+  const [requestText, setRequestText] = useState(specialRequest);
+
+  useEffect(() => {
+    if (specialRequest !== undefined) {
+      setRequestText(specialRequest);
+    }
+  }, [specialRequest]);
 
   const handleAddPress = () => {
-    setRequestText('');
+    setRequestText(specialRequest);
     setShowInput(true);
     if (onAddPress) onAddPress();
   };
 
   const handleSave = () => {
-    if (onSave && requestText.trim()) {
+    if (onSave) {
       onSave(requestText.trim());
     }
-    // setRequestText('');
     setShowInput(false);
   };
 
@@ -56,19 +63,56 @@ export default function SpecialRequestSection({
       </View>
 
       {!showInput ? (
-        <TouchableOpacity
-          style={[styles.addBtn, { borderColor: colors.borderSubtle }]}
-          onPress={handleAddPress}
-        >
-          <Text
+        specialRequest ? (
+          <View
             style={[
-              styles.addBtnText,
-              { color: colors.darkBrown, fontFamily: colors.fontRegular },
+              styles.savedContainer,
+              {
+                borderColor: colors.borderSubtle,
+                backgroundColor: colors.inputBackground || colors.background,
+              },
             ]}
           >
-            Add+
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.savedText,
+                { color: colors.text, fontFamily: colors.fontRegular },
+              ]}
+            >
+              {specialRequest}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.editBtn,
+                { borderColor: colors.borderSubtle, backgroundColor: colors.background },
+              ]}
+              onPress={() => setShowInput(true)}
+            >
+              <Text
+                style={[
+                  styles.editBtnText,
+                  { color: colors.primary, fontFamily: colors.fontRegular },
+                ]}
+              >
+                Edit
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            style={[styles.addBtn, { borderColor: colors.borderSubtle, backgroundColor: colors.background }]}
+            onPress={handleAddPress}
+          >
+            <Text
+              style={[
+                styles.addBtnText,
+                { color: colors.darkBrown, fontFamily: colors.fontRegular },
+              ]}
+            >
+              Add+
+            </Text>
+          </TouchableOpacity>
+        )
       ) : (
         <View style={styles.inputContainer}>
           <TextInput
@@ -78,9 +122,10 @@ export default function SpecialRequestSection({
                 borderColor: colors.borderSubtle,
                 color: colors.text,
                 fontFamily: colors.fontRegular,
+                backgroundColor: colors.inputBackground || colors.background,
               },
             ]}
-            placeholder="Type your special request here..."
+            placeholder="Specify the product name for your request (e.g. Add extra spice to soup)"
             placeholderTextColor={colors.textMuted}
             value={requestText}
             onChangeText={setRequestText}
@@ -91,10 +136,10 @@ export default function SpecialRequestSection({
           />
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: colors.borderSubtle }]}
+              style={[styles.cancelBtn, { borderColor: colors.borderSubtle, backgroundColor: colors.background }]}
               onPress={() => {
                 setShowInput(false);
-                setRequestText('');
+                setRequestText(specialRequest);
               }}
             >
               <Text
@@ -153,10 +198,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: sw(24),
     paddingVertical: sh(8),
     alignSelf: 'flex-start',
-    backgroundColor: '#FFFFFF',
   },
   addBtnText: {
     fontSize: fs(14),
+  },
+  savedContainer: {
+    borderWidth: 1,
+    borderRadius: sw(12),
+    padding: sw(16),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  savedText: {
+    fontSize: fs(14),
+    flex: 1,
+    marginRight: sw(12),
+    lineHeight: fs(20),
+  },
+  editBtn: {
+    borderWidth: 1,
+    borderRadius: sw(16),
+    paddingHorizontal: sw(16),
+    paddingVertical: sh(6),
+  },
+  editBtnText: {
+    fontSize: fs(12),
   },
   inputContainer: {
     marginTop: sh(8),
@@ -167,7 +234,6 @@ const styles = StyleSheet.create({
     padding: sw(12),
     fontSize: fs(14),
     minHeight: sh(80),
-    backgroundColor: '#FFFFFF',
   },
   buttonRow: {
     flexDirection: 'row',
@@ -180,7 +246,6 @@ const styles = StyleSheet.create({
     borderRadius: sw(8),
     paddingHorizontal: sw(20),
     paddingVertical: sh(8),
-    backgroundColor: '#FFFFFF',
   },
   cancelBtnText: {
     fontSize: fs(14),

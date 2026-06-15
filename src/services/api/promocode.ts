@@ -1,5 +1,6 @@
 import apiClient from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BASE_URL } from '../../constants/api';
 
 export interface Promocode {
   id: number;
@@ -50,31 +51,23 @@ export const promocodeService = {
     formData.append('customer_id', customerId);
     formData.append('promo_code', promoCode);
 
-    try {
-      const { data } = await apiClient.post(
-        '/customer/validate-promo-code',
-        formData,
-        {
-          headers: {
-            bearer: token,
-            'Content-Type': 'multipart/form-data',
-          },
-        },
-      );
+    const response = await fetch(`${BASE_URL}/api/customer/validate-promo-code`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `bearer ${token}`,
+        bearer: `${token}`,
+        token: `${token}`,
+      },
+      body: formData,
+    });
 
-      if (data?.success === false) {
-        throw new Error(data?.message);
-      }
+    const data = await response.json();
 
-      return data;
-    } catch (error: any) {
-      // Axios HTTP error (4xx/5xx) — extract message from response body
-      const apiMessage = error.response?.data?.message;
-      if (apiMessage) {
-        throw new Error(apiMessage);
-      }
-      // Re-throw as-is (already a plain Error from the success===false check above)
-      throw error;
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || 'Failed to apply promocode');
     }
+
+    return data;
   },
 };

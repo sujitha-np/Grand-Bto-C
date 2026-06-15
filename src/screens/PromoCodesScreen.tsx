@@ -80,7 +80,7 @@ export default function PromoCodesScreen({
 
           {item.min_product_price ? (
             <Text style={styles.minPrice}>
-              Min order: QAR {item.min_product_price}
+              Min order: QAR {parseFloat(item.min_product_price).toFixed(2)}
             </Text>
           ) : null}
 

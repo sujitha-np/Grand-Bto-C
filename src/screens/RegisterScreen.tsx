@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Image,
   KeyboardAvoidingView,
@@ -9,6 +9,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +45,26 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
   const [dobOpen, setDobOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const styles = React.useMemo(
     () => createStyles(colors, insets),
@@ -137,7 +158,11 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
       <StatusBar
         barStyle={colors.statusBar}
         backgroundColor={colors.background}
@@ -145,145 +170,143 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
 
       <Header title={t('register.title')} onBack={onBack} />
 
-      <KeyboardAvoidingView
+      <ScrollView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        contentContainerStyle={[
+          styles.scrollContent,
+          keyboardHeight > 0 && { paddingBottom: keyboardHeight + sh(40) }
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={styles.pageTitle}>{t('register.enterDetails')}</Text>
+        <Text style={styles.pageTitle}>{t('register.enterDetails')}</Text>
 
-          <InputField
-            label={t('register.name')}
-            placeholder={t('register.namePlaceholder')}
-            value={name}
-            onChangeText={setName}
-            autoCapitalize="words"
-            leftIcon={Images.name}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
-            error={errors.name}
-          />
+        <InputField
+          label={t('register.name')}
+          placeholder={t('register.namePlaceholder')}
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="words"
+          leftIcon={Images.name}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+          error={errors.name}
+        />
 
-          <InputField
-            maxLength={8}
-            label={t('register.phone')}
-            placeholder={t('register.phonePlaceholder')}
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            leftIcon={Images.call}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
-            error={errors.phone}
-          />
+        <InputField
+          maxLength={8}
+          label={t('register.phone')}
+          placeholder={t('register.phonePlaceholder')}
+          value={phone}
+          onChangeText={setPhone}
+          keyboardType="phone-pad"
+          leftIcon={Images.call}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+          error={errors.phone}
+        />
 
-          {/* Gender — custom dropdown picker */}
-          <View style={[styles.genderWrapper, styles.fieldWrapper]}>
-            <Text style={styles.genderLabel}>{t('register.gender')}</Text>
-            <TouchableOpacity
-              style={styles.genderRow}
-              onPress={() => setGenderOpen(o => !o)}
-              activeOpacity={0.8}
-            >
-              <Image
-                source={Images.gender}
-                style={styles.genderIconImg}
-                resizeMode="contain"
-              />
-              <Text style={styles.genderText}>{t(`register.${gender}`)}</Text>
-              <Text style={styles.chevron}>{'v'}</Text>
-            </TouchableOpacity>
-            {genderOpen && (
-              <View style={styles.dropdown}>
-                {GENDER_OPTIONS.map(opt => (
-                  <TouchableOpacity
-                    key={opt}
-                    style={styles.dropdownItem}
-                    onPress={() => {
-                      setGender(opt);
-                      setGenderOpen(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownText,
-                        opt === gender && styles.dropdownTextActive,
-                      ]}
-                    >
-                      {t(`register.${opt}`)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
-
+        {/* Gender — custom dropdown picker */}
+        <View style={[styles.genderWrapper, styles.fieldWrapper]}>
+          <Text style={styles.genderLabel}>{t('register.gender')}</Text>
           <TouchableOpacity
+            style={styles.genderRow}
+            onPress={() => setGenderOpen(o => !o)}
             activeOpacity={0.8}
-            onPress={() => {
-              setDobOpen(true);
-            }}
           >
-            <View pointerEvents="none">
-              <InputField
-                label={t('register.dob')}
-                placeholder={t('register.dobPlaceholder')}
-                value={dob}
-                editable={false}
-                onChangeText={setDob}
-                leftIcon={Images.calendar}
-                containerStyle={styles.fieldWrapper}
-                inputContainerStyle={styles.fieldContainer}
-                error={errors.dob}
-              />
-            </View>
+            <Image
+              source={Images.gender}
+              style={styles.genderIconImg}
+              resizeMode="contain"
+            />
+            <Text style={styles.genderText}>{t(`register.${gender}`)}</Text>
+            <Text style={styles.chevron}>{'v'}</Text>
           </TouchableOpacity>
+          {genderOpen && (
+            <View style={styles.dropdown}>
+              {GENDER_OPTIONS.map(opt => (
+                <TouchableOpacity
+                  key={opt}
+                  style={styles.dropdownItem}
+                  onPress={() => {
+                    setGender(opt);
+                    setGenderOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.dropdownText,
+                      opt === gender && styles.dropdownTextActive,
+                    ]}
+                  >
+                    {t(`register.${opt}`)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
 
-          <InputField
-            label={t('register.email')}
-            placeholder={t('register.emailPlaceholder')}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            leftIcon={Images.mail}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
-            error={errors.email}
-          />
-
-          <InputField
-            label={t('register.password')}
-            placeholder={t('register.passwordPlaceholder')}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            leftIcon={Images.password}
-            rightIcon={Images.eye}
-            onRightIconPress={() => setShowPassword(v => !v)}
-            containerStyle={styles.fieldWrapper}
-            inputContainerStyle={styles.fieldContainer}
-            error={errors.password}
-          />
-
-          {/* Next button */}
-          <View style={styles.btnContainer}>
-            <Button
-              label={t('register.next')}
-              onPress={handleRegister}
-              loading={loading}
-              variant="primary"
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => {
+            setDobOpen(true);
+          }}
+        >
+          <View pointerEvents="none">
+            <InputField
+              label={t('register.dob')}
+              placeholder={t('register.dobPlaceholder')}
+              value={dob}
+              editable={false}
+              onChangeText={setDob}
+              leftIcon={Images.calendar}
+              containerStyle={styles.fieldWrapper}
+              inputContainerStyle={styles.fieldContainer}
+              error={errors.dob}
             />
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+        </TouchableOpacity>
+
+        <InputField
+          label={t('register.email')}
+          placeholder={t('register.emailPlaceholder')}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          leftIcon={Images.mail}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+          error={errors.email}
+        />
+
+        <InputField
+          label={t('register.password')}
+          placeholder={t('register.passwordPlaceholder')}
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry={!showPassword}
+          autoCapitalize="none"
+          leftIcon={Images.password}
+          rightIcon={Images.eye}
+          onRightIconPress={() => setShowPassword(v => !v)}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+          error={errors.password}
+        />
+
+        {/* Next button */}
+        <View style={styles.btnContainer}>
+          <Button
+            label={t('register.next')}
+            onPress={handleRegister}
+            loading={loading}
+            variant="primary"
+          />
+        </View>
+      </ScrollView>
       <CustomDatePicker
         visible={dobOpen}
         onClose={() => setDobOpen(false)}
@@ -291,8 +314,9 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
           setDob(date);
           setDobOpen(false);
         }}
+        selectedDate={dob}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -310,7 +334,7 @@ const createStyles = (colors: any, insets: any) =>
     scrollContent: {
       paddingHorizontal: sw(20),
       paddingTop: sh(4),
-      paddingBottom: sh(40),
+      paddingBottom: sh(80),
     },
     pageTitle: {
       fontSize: fs(32),

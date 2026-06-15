@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import apiClient from './client';
 import { BASE_URL } from '../../constants/api';
 
 export interface SavedAddress {

@@ -81,7 +81,7 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
           <Text style={styles.itemName} numberOfLines={2}>
             {item.product_name}
           </Text>
-          <Text style={styles.itemPrice}>{item.price} QAR</Text>
+          <Text style={styles.itemPrice}>{parseFloat(item.price).toFixed(2)} QAR</Text>
           <Text style={styles.itemDate}>
             Added: {new Date(item.added_at).toLocaleDateString()}
           </Text>

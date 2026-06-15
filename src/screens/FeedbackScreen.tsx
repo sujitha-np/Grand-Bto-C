@@ -312,7 +312,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(40),
       height: sw(40),
       borderRadius: sw(20),
-      backgroundColor: colors.white,
+      backgroundColor: colors.card,
       justifyContent: 'center',
       alignItems: 'center',
       shadowColor: '#000',

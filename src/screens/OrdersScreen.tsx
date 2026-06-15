@@ -21,17 +21,33 @@ import { BASE_URL } from '../constants/api';
 import { Images } from '../assets/images';
 import { CustomDatePicker } from '../components/common';
 
-function OrdersScreen() {
+interface OrdersScreenProps {
+  initialDate?: string;
+  onClearInitialDate?: () => void;
+}
+
+function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
   const { t } = useTranslation();
   const colors = useTheme();
   const insets = useSafeAreaInsets();
 
   const [customerId, setCustomerId] = useState<string | undefined>(undefined);
   const [selectedDate, setSelectedDate] = useState<string>(
-    new Date().toISOString().split('T')[0],
+    (initialDate ? initialDate.split(' ')[0].split('T')[0] : '') ||
+      new Date().toISOString().split('T')[0],
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialDate) {
+      const parsedDate = initialDate.split(' ')[0].split('T')[0];
+      setSelectedDate(parsedDate);
+      if (onClearInitialDate) {
+        onClearInitialDate();
+      }
+    }
+  }, [initialDate, onClearInitialDate]);
 
   useEffect(() => {
     const fetchCustomer = async () => {
@@ -50,6 +66,37 @@ function OrdersScreen() {
     isRefetching,
   } = useOrders(customerId, selectedDate);
   const orders = ordersResponse?.data?.orders || [];
+
+  const getOrderDateDisplay = () => {
+    if (orders.length > 0 && orders[0].formatted_date) {
+      try {
+        const datePart = orders[0].formatted_date.split(',')[0].trim();
+        const parts = datePart.split(/\s+/);
+        if (parts.length >= 2) {
+          const day = parseInt(parts[0], 10);
+          const month = parts[1];
+          if (month && !isNaN(day)) {
+            return `${month} ${day}`;
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing formatted_date:', e);
+      }
+    }
+    if (orders.length > 0 && orders[0].created_at) {
+      const parsedDate = new Date(orders[0].created_at);
+      if (!isNaN(parsedDate.getTime())) {
+        return parsedDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+        });
+      }
+    }
+    return new Date(selectedDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    });
+  };
   const [refreshing, setRefreshing] = useState(false);
 
   const onRefresh = async () => {
@@ -135,7 +182,7 @@ function OrdersScreen() {
           { color: colors.text, fontFamily: colors.fontSemiBold },
         ]}
       >
-        {item.item_grand_total} QAR
+        {parseFloat(item.item_grand_total).toFixed(2)} QAR
       </Text>
     </View>
   );
@@ -148,7 +195,7 @@ function OrdersScreen() {
     return (
       <View
         key={order.id}
-        style={[styles.orderCard, { backgroundColor: colors.white }]}
+        style={[styles.orderCard, { backgroundColor: colors.card }]}
       >
         <TouchableOpacity
           onPress={() => setExpandedOrderId(isExpanded ? null : order.id)}
@@ -162,7 +209,7 @@ function OrdersScreen() {
                   { color: colors.text, fontFamily: colors.fontSemiBold },
                 ]}
               >
-                {order.unique_id}
+                Order #{order.unique_id}
               </Text>
               <Text
                 style={[
@@ -170,7 +217,11 @@ function OrdersScreen() {
                   { color: colors.textMuted, fontFamily: colors.fontRegular },
                 ]}
               >
-                {order.formatted_date}
+                {new Date(order.created_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                })}
               </Text>
             </View>
             <View
@@ -178,7 +229,7 @@ function OrdersScreen() {
                 styles.statusBadge,
                 {
                   borderColor: statusColor,
-                  backgroundColor: `${statusColor}10`,
+                  backgroundColor: statusColor + '15',
                 },
               ]}
             >
@@ -214,7 +265,7 @@ function OrdersScreen() {
             >
               {isExpanded
                 ? 'Show Less'
-                : `Show ${order.items.length - 1} More Items`}
+                : `+ ${order.items.length - 1} more items`}
             </Text>
           </TouchableOpacity>
         )}
@@ -234,7 +285,7 @@ function OrdersScreen() {
               { color: colors.primary, fontFamily: colors.fontBold },
             ]}
           >
-            {order.grand_total} QAR
+            {parseFloat(order.grand_total).toFixed(2)} QAR
           </Text>
         </View>
       </View>
@@ -249,7 +300,7 @@ function OrdersScreen() {
           styles.header,
           {
             paddingTop: insets.top + sh(12),
-            backgroundColor: colors.white,
+            backgroundColor: colors.background,
           },
         ]}
       >
@@ -257,13 +308,13 @@ function OrdersScreen() {
           {t('home.ordersTab')}
         </Text>
         <TouchableOpacity
-          style={styles.calendarButton}
+          style={[styles.calendarButton, { backgroundColor: colors.card }]}
           onPress={() => setShowCalendar(true)}
           activeOpacity={0.7}
         >
           <Image
             source={Images.calendar}
-            style={styles.calendarIcon}
+            style={[styles.calendarIcon, { tintColor: colors.text }]}
             resizeMode="contain"
           />
         </TouchableOpacity>
@@ -275,6 +326,7 @@ function OrdersScreen() {
         onClose={() => setShowCalendar(false)}
         onSelect={handleDateChange}
         mode="any"
+        selectedDate={selectedDate}
       />
 
       {isLoading || isRefetching ? (
@@ -311,10 +363,7 @@ function OrdersScreen() {
             <View style={styles.dateInfo}>
               <Text style={[styles.dateLabel, { color: colors.text }]}>
                 Ordered on:{' '}
-                {new Date(selectedDate).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                })}
+                {getOrderDateDisplay()}
               </Text>
             </View>
             <View style={styles.dateInfo}>
@@ -515,7 +564,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: sw(12),
     paddingVertical: sh(6),
     borderRadius: sw(16),
-    borderWidth: 1.5,
+    borderWidth: 0.5,
   },
   statusText: {
     fontSize: fs(12),

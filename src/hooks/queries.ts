@@ -16,6 +16,7 @@ import { wishlistService } from '../services/api/wishlist';
 import { promocodeService } from '../services/api/promocode';
 import { feedbackService } from '../services/api/feedback';
 import { addonsService } from '../services/api/addons';
+import { settingsService } from '../services/api/settings';
 import Toast from 'react-native-toast-message';
 
 export const useDepartments = () => {
@@ -222,13 +223,75 @@ export const useUpdateCartQuantity = () => {
         params.quantity,
       );
     },
-    onSuccess: (data, variables) => {
-      if (data.success) {
-        // Invalidate cart query to refetch with updated quantities
-        queryClient.invalidateQueries({
-          queryKey: ['cart', variables.customerId, variables.preorderDate],
-        });
-      } else {
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({
+        queryKey: ['cart', variables.customerId, variables.preorderDate],
+      });
+
+      // Snapshot the previous value
+      const previousCart = queryClient.getQueryData([
+        'cart',
+        variables.customerId,
+        variables.preorderDate,
+      ]);
+
+      // Optimistically update to the new value
+      queryClient.setQueryData(
+        ['cart', variables.customerId, variables.preorderDate],
+        (old: any) => {
+          if (!old) return old;
+          const updatedItems = (old.data?.cart?.items || []).map((item: any) => {
+            if (item.product_id === variables.productId) {
+              return {
+                ...item,
+                quantity: variables.quantity,
+              };
+            }
+            return item;
+          });
+
+          // Recalculate subtotal and total
+          let subtotal = 0;
+          updatedItems.forEach((item: any) => {
+            subtotal += parseFloat(item.price) * parseInt(item.quantity, 10);
+          });
+          const total_amount = subtotal;
+
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              cart: {
+                ...old.data?.cart,
+                items: updatedItems,
+                subtotal,
+                total_amount,
+              },
+            },
+          };
+        },
+      );
+
+      // Return a context object with the snapshotted value
+      return { previousCart };
+    },
+    onError: (error: any, variables, context) => {
+      // Rollback to the previous value if mutation fails
+      if (context?.previousCart) {
+        queryClient.setQueryData(
+          ['cart', variables.customerId, variables.preorderDate],
+          context.previousCart,
+        );
+      }
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'An error occurred while updating quantity.',
+      });
+    },
+    onSuccess: (data) => {
+      if (!data.success) {
         Toast.show({
           type: 'error',
           text1: 'Error',
@@ -236,11 +299,10 @@ export const useUpdateCartQuantity = () => {
         });
       }
     },
-    onError: error => {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: error.message || 'An error occurred while updating quantity.',
+    onSettled: (data, error, variables) => {
+      // Always refetch after error or success to keep server in sync
+      queryClient.invalidateQueries({
+        queryKey: ['cart', variables.customerId, variables.preorderDate],
       });
     },
   });
@@ -262,19 +324,61 @@ export const useRemoveFromCart = () => {
         params.productId,
       );
     },
-    onSuccess: (data, variables) => {
-      Toast.show({
-        type: 'success',
-        text1: 'Item Removed',
-        text2: data.message || 'Item removed from cart successfully!',
-      });
-      // Invalidate cart query to refetch without the removed item
-      queryClient.invalidateQueries({
+    onMutate: async (variables) => {
+      // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+      await queryClient.cancelQueries({
         queryKey: ['cart', variables.customerId, variables.preorderDate],
       });
+
+      // Snapshot the previous value
+      const previousCart = queryClient.getQueryData([
+        'cart',
+        variables.customerId,
+        variables.preorderDate,
+      ]);
+
+      // Optimistically update to the new value (remove the item)
+      queryClient.setQueryData(
+        ['cart', variables.customerId, variables.preorderDate],
+        (old: any) => {
+          if (!old) return old;
+          const updatedItems = (old.data?.cart?.items || []).filter(
+            (item: any) => item.product_id !== variables.productId,
+          );
+
+          // Recalculate subtotal and total
+          let subtotal = 0;
+          updatedItems.forEach((item: any) => {
+            subtotal += parseFloat(item.price) * parseInt(item.quantity, 10);
+          });
+          const total_amount = subtotal;
+
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              cart: {
+                ...old.data?.cart,
+                items: updatedItems,
+                subtotal,
+                total_amount,
+              },
+            },
+          };
+        },
+      );
+
+      // Return a context object with the snapshotted value
+      return { previousCart };
     },
-    onError: (error: any) => {
-      // Handle thrown errors (network errors, validation errors, etc.)
+    onError: (error: any, variables, context) => {
+      // Rollback to the previous value if mutation fails
+      if (context?.previousCart) {
+        queryClient.setQueryData(
+          ['cart', variables.customerId, variables.preorderDate],
+          context.previousCart,
+        );
+      }
       console.error('Remove from cart error:', error);
       Toast.show({
         type: 'error',
@@ -282,10 +386,25 @@ export const useRemoveFromCart = () => {
         text2: error.message || 'An error occurred while removing item.',
       });
     },
+    onSuccess: (data) => {
+      Toast.show({
+        type: 'success',
+        text1: 'Item Removed',
+        text2: data.message || 'Item removed from cart successfully!',
+      });
+    },
+    onSettled: (data, error, variables) => {
+      // Always refetch after error or success to keep server in sync
+      queryClient.invalidateQueries({
+        queryKey: ['cart', variables.customerId, variables.preorderDate],
+      });
+    },
   });
 };
 
 export const useSpecialRequest = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: (params: {
       cartId: string;
@@ -298,11 +417,15 @@ export const useSpecialRequest = () => {
         params.specialRequest,
       );
     },
-    onSuccess: data => {
+    onSuccess: (data, variables) => {
       Toast.show({
         type: 'success',
         text1: 'Special Request Saved',
         text2: data.message || 'Special request added successfully!',
+      });
+      // Invalidate cart queries to trigger UI update
+      queryClient.invalidateQueries({
+        queryKey: ['cart', variables.customerId],
       });
     },
     onError: (error: any) => {
@@ -458,24 +581,27 @@ export const useCheckout = () => {
       address_id: string;
       use_wallet: number;
       payment_type: number;
+      promo_code?: string;
     }) => {
       return checkoutService.placeOrder(payload);
     },
     onSuccess: data => {
       if (data.success) {
-        Toast.show({
-          type: 'success',
-          text1: 'Order Placed',
-          text2: data.message || 'Your order has been placed successfully!',
-        });
-        // Invalidate cart queries to clear the cart after checkout
-        queryClient.invalidateQueries({
-          queryKey: ['cart'],
-        });
-        // Invalidate orders queries to refresh order list
-        queryClient.invalidateQueries({
-          queryKey: ['orders'],
-        });
+        if (!data.requires_payment) {
+          Toast.show({
+            type: 'success',
+            text1: 'Order Placed',
+            text2: data.message || 'Your order has been placed successfully!',
+          });
+          // Invalidate cart queries to clear the cart after checkout
+          queryClient.invalidateQueries({
+            queryKey: ['cart'],
+          });
+          // Invalidate orders queries to refresh order list
+          queryClient.invalidateQueries({
+            queryKey: ['orders'],
+          });
+        }
       } else {
         Toast.show({
           type: 'error',
@@ -664,13 +790,15 @@ export const useApplyPromocode = () => {
     onSuccess: data => {
       Toast.show({
         type: 'success',
-        text1: data.message,
+        text1: 'Promo Code Applied',
+        text2: data.message || 'Promo code applied successfully!',
       });
     },
     onError: (error: any) => {
       Toast.show({
         type: 'error',
-        text1: error.message,
+        text1: 'Promo Code Error',
+        text2: error.message || 'Failed to apply promo code.',
       });
     },
   });
@@ -712,3 +840,36 @@ export const useAddons = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
+
+export const usePreorderLimit = () => {
+  return useQuery({
+    queryKey: ['preorderLimit'],
+    queryFn: () => settingsService.getPreorderLimit(),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+export const useCheckoutDetails = (
+  customerId?: string,
+  cartId?: string,
+  deliveryDate?: string,
+  deliveryTime?: string
+) => {
+  return useQuery({
+    queryKey: ['checkoutDetails', customerId, cartId, deliveryDate, deliveryTime],
+    queryFn: async () => {
+      if (!customerId || !cartId || !deliveryDate || !deliveryTime) {
+        return null;
+      }
+      return checkoutService.cartCheckout({
+        customer_id: customerId,
+        cart_id: cartId,
+        delivery_date: deliveryDate,
+        delivery_time: deliveryTime,
+      });
+    },
+    enabled: !!customerId && !!cartId && !!deliveryDate && !!deliveryTime,
+    staleTime: 0,
+  });
+};
+

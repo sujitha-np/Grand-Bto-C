@@ -1,4 +1,5 @@
 import apiClient from './client';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../constants/api';
 
 export interface Product {
@@ -35,6 +36,14 @@ export interface Product {
   offer_price: string;
   preparation_time_minutes?: number;
   preparation_time_formatted?: string;
+  offer?: {
+    id: number;
+    offer_id: number;
+    product_id: number;
+    offer_price: string;
+    custom_price: string;
+    status: number;
+  } | null;
 }
 
 export interface ProductDetail extends Product {
@@ -156,12 +165,28 @@ export const productService = {
   },
   searchProducts: async (searchTerm: string) => {
     try {
-      const { data } = await apiClient.post('/customer/products/search', {
-        search_term: searchTerm,
+      const token = await AsyncStorage.getItem('userToken');
+      const formData = new FormData();
+      formData.append('search_term', searchTerm);
+
+      console.log('Search API - Token:', token ? 'Found' : 'NOT FOUND');
+      console.log('Search API - search_term:', searchTerm);
+
+      const response = await fetch(`${BASE_URL}/api/customer/products/search`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          Authorization: `bearer ${token}`,
+          bearer: `${token}`,
+          token: `${token}`,
+        },
+        body: formData,
       });
+
+      const data = await response.json();
       console.log('Raw search products API response:', data);
 
-      if (data?.success === false || data?.error) {
+      if (!response.ok || data?.success === false || data?.error) {
         console.log('API returned success:false or error:', data);
         throw new Error('Failed to search products');
       }
@@ -169,12 +194,6 @@ export const productService = {
       return data;
     } catch (error: any) {
       console.log('Search products API error:', error);
-      if (error.response?.data) {
-        console.log('Error response data:', error.response.data);
-        throw new Error(
-          error.response.data?.message || 'Failed to search products',
-        );
-      }
       throw error;
     }
   },

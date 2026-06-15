@@ -7,6 +7,7 @@ export interface CheckoutRequest {
   address_id: string;
   use_wallet?: number;
   payment_type: number; // 1 = cash on delivery, 2 = online
+  promo_code?: string;
 }
 
 export interface CheckoutResponse {
@@ -35,6 +36,24 @@ export interface CartCheckoutResponse {
   non_deliverable_products?: NonDeliverableProduct[];
   requested_delivery?: string;
   suggestion?: string;
+  data?: {
+    cart_id: number;
+    preorder_date: string | null;
+    delivery_date: string;
+    delivery_time: string;
+    special_request: string | null;
+    cart_items: {
+      product_id: string;
+      product_name: string;
+      product_name_ar: string;
+      price: string;
+      quantity: number;
+      total: number;
+      image: string;
+    }[];
+    subtotal: number;
+    total_amount: number;
+  };
 }
 
 export interface CartCheckoutRequest {
@@ -57,6 +76,9 @@ export const checkoutService = {
     formData.append('payment_type', String(checkoutData.payment_type));
     if (checkoutData.use_wallet !== undefined) {
       formData.append('use_wallet', String(checkoutData.use_wallet));
+    }
+    if (checkoutData.promo_code !== undefined && checkoutData.promo_code !== '') {
+      formData.append('promo_code', checkoutData.promo_code);
     }
 
     const response = await fetch(`${BASE_URL}/api/customer/place-order`, {
@@ -85,6 +107,7 @@ export const checkoutService = {
     payload: CartCheckoutRequest,
   ): Promise<CartCheckoutResponse> => {
     const token = await AsyncStorage.getItem('userToken');
+    console.log('[checkoutService.cartCheckout] token:', token, 'payload:', payload);
 
     const formData = new FormData();
     formData.append('customer_id', payload.customer_id);
@@ -104,6 +127,16 @@ export const checkoutService = {
     });
 
     const data = await response.json();
+    console.log('[checkoutService.cartCheckout] response status:', response.status, 'data:', data);
+
+    if (!response.ok) {
+      const error: any = new Error(
+        data?.message || `Request failed with status ${response.status}`,
+      );
+      error.data = data;
+      throw error;
+    }
+
     return data;
   },
 };
