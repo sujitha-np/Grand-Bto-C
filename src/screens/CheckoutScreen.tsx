@@ -23,6 +23,8 @@ import { orderService } from '../services/api/order';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { WebView } from 'react-native-webview';
+import OrderSuccessView from '../components/checkout/OrderSuccessView';
+import PaymentFailedView from '../components/checkout/PaymentFailedView';
 
 interface CheckoutScreenProps {
   onBack: () => void;
@@ -57,6 +59,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [promoDiscount, setPromoDiscount] = useState<number>(0);
   const [discountedTotal, setDiscountedTotal] = useState<number | null>(null);
   const [appliedPromoCode, setAppliedPromoCode] = useState<string>('');
+  const [specialRequest, setSpecialRequest] = useState<string>('');
 
   // Online payment helper states
   const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
@@ -68,6 +71,10 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [webViewKey, setWebViewKey] = useState<number>(0);
   const appState = useRef(AppState.currentState);
+  const hasHttpErrorRef = useRef<boolean>(false);
+  const paymentCompletedRef = useRef<boolean>(false);
+  const currentUrlRef = useRef<string>('');
+  const webViewRef = useRef<any>(null);
 
   const { data: cartResponse, isLoading: loadingCart } = useCart(
     customerId,
@@ -90,6 +97,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const { mutate: applyPromocode, isPending: applyingPromo } =
     useApplyPromocode();
 
+  const cartData = (cartResponse?.data as any)?.cart;
+  const checkoutData = checkoutDetailsResponse?.data;
+
+  const items = checkoutData?.cart_items || cartData?.items || [];
+  const subtotal = checkoutData?.subtotal ?? cartData?.subtotal ?? 0;
+  const totalAmount = checkoutData?.total_amount ?? cartData?.total_amount ?? 0;
+
   useEffect(() => {
     const fetchCustomer = async () => {
       const id = await AsyncStorage.getItem('customerId');
@@ -100,6 +114,22 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     fetchCustomer();
   }, []);
 
+  useEffect(() => {
+    const loadSpecialRequest = async () => {
+      try {
+        const persisted = await AsyncStorage.getItem(`special_request_${cartId}`);
+        if (persisted !== null) {
+          setSpecialRequest(persisted);
+        } else if (checkoutData?.special_request) {
+          setSpecialRequest(checkoutData.special_request);
+        }
+      } catch (e) {
+        console.error('Failed to load persisted special request in checkout', e);
+      }
+    };
+    loadSpecialRequest();
+  }, [cartId, checkoutData?.special_request]);
+
   // Listen to AppState changes to auto-verify payment status when returning to app
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
@@ -108,8 +138,8 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         nextAppState === 'active'
       ) {
         // App returned to foreground
-        if (createdOrderId) {
-          handleVerifyPayment(createdOrderId, true);
+        if (createdOrderId || createdOrderUniqueId) {
+          handleVerifyPayment(createdOrderId, createdOrderUniqueId, true);
         }
       }
       appState.current = nextAppState;
@@ -118,63 +148,79 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     return () => {
       subscription.remove();
     };
-  }, [createdOrderId]);
+  }, [createdOrderId, createdOrderUniqueId]);
 
-  const cartData = (cartResponse?.data as any)?.cart;
-  const checkoutData = checkoutDetailsResponse?.data;
 
-  const items = checkoutData?.cart_items || cartData?.items || [];
-  const subtotal = checkoutData?.subtotal ?? cartData?.subtotal ?? 0;
-  const totalAmount = checkoutData?.total_amount ?? cartData?.total_amount ?? 0;
-  const specialRequest = checkoutData?.special_request || '';
+  // Helper: Evaluate isPaid
+  const evaluateIsPaid = (order: any): boolean => {
+    const condA = order.payment_status === 2;
+    const condB = order.payment_status_text?.toLowerCase() === 'paid';
+    const condC = order.payment_status_text?.toLowerCase() === 'success';
+    return condA || condB || condC;
+  };
 
-  const handleVerifyPayment = async (orderId: number, isSilent = false) => {
-    if (!customerId) return;
+  const handleVerifyPayment = async (
+    orderId: number | null,
+    uniqueId: string | null = null,
+    isSilent = false
+  ): Promise<boolean> => {
+    if (!customerId) return false;
     if (!isSilent) {
       setIsVerifyingPayment(true);
     }
     try {
-      const response = await orderService.getOrderHistory(customerId);
-      console.log('Verify Payment - Order History Response:', JSON.stringify(response, null, 2));
-      const orders = response.data?.orders || [];
-      const order = orders.find(o => o.id === orderId);
-      console.log('Verify Payment - Target Order:', JSON.stringify(order, null, 2));
-      if (order) {
-        // Check if status is paid (payment_status === 2 or text has paid/success, or tracking status is not pending/cancelled)
-        const isPaid =
-          order.payment_status === 2 ||
-          order.payment_status_text?.toLowerCase() === 'paid' ||
-          order.payment_status_text?.toLowerCase() === 'success' ||
-          (order.tracking_status_text &&
-            order.tracking_status_text.toLowerCase() !== 'pending' &&
-            order.tracking_status_text.toLowerCase() !== 'cancelled');
+      let isPaid = false;
+      let order = null;
+      const maxAttempts = 5;
+      const delayMs = 3000;
 
-        console.log('Verify Payment - Calculated isPaid status:', isPaid);
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const response = await orderService.getOrderHistory(customerId);
+        const orders = response.data?.orders || [];
 
-        if (isPaid) {
-          console.log('>>> [PAYMENT VERIFICATION RESULT]: SUCCESS for Order ID', orderId);
-          Toast.show({
-            type: 'success',
-            text1: 'Order Placed',
-            text2: 'Your order has been placed successfully!',
-          });
-          queryClient.invalidateQueries({ queryKey: ['cart'] });
-          queryClient.invalidateQueries({ queryKey: ['orders'] });
-          setCreatedOrderId(null);
-          setCreatedOrderUniqueId(null);
-          setSuccessOrderId(order.unique_id);
-        } else {
-          console.log('>>> [PAYMENT VERIFICATION RESULT]: PENDING/FAILED for Order ID', orderId);
-          if (!isSilent) {
-            Toast.show({
-              type: 'info',
-              text1: 'Payment Pending',
-              text2: 'We could not verify your payment. Please try again if you completed the payment.',
-            });
+        order = orders.find((o: any) => 
+          (orderId !== null && (o.id === orderId || String(o.id) === String(orderId) || o.unique_id === String(orderId))) || 
+          (uniqueId !== null && (o.unique_id === uniqueId || String(o.id) === String(uniqueId)))
+        );
+
+        if (order) {
+          isPaid = evaluateIsPaid(order);
+          if (isPaid) {
+            break;
           }
         }
+
+        if (attempt < maxAttempts && !isPaid) {
+          await new Promise<void>(resolve => setTimeout(resolve, delayMs));
+        }
+      }
+
+      if (order && isPaid) {
+        Toast.show({
+          type: 'success',
+          text1: 'Order Placed',
+          text2: 'Your order has been placed successfully!',
+        });
+        queryClient.invalidateQueries({ queryKey: ['cart'] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        
+        AsyncStorage.removeItem(`special_request_${cartId}`).catch(err => {
+          console.error('Failed to remove special request', err);
+        });
+
+        setCreatedOrderId(null);
+        setCreatedOrderUniqueId(null);
+        setSuccessOrderId(order.unique_id);
+        return true;
+      } else if (order && !isPaid) {
+        if (!isSilent) {
+          Toast.show({
+            type: 'info',
+            text1: 'Payment Pending',
+            text2: 'We could not verify your payment. Please try again if you completed the payment.',
+          });
+        }
       } else {
-        console.log('>>> [PAYMENT VERIFICATION RESULT]: ORDER NOT FOUND for Order ID', orderId);
         if (!isSilent) {
           Toast.show({
             type: 'error',
@@ -183,8 +229,8 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           });
         }
       }
+      return false;
     } catch (err: any) {
-      console.log('>>> [PAYMENT VERIFICATION RESULT]: ERROR verifying Order ID', orderId, err);
       console.error('Error verifying payment status:', err);
       if (!isSilent) {
         Toast.show({
@@ -193,6 +239,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           text2: err.message || 'Failed to verify payment status.',
         });
       }
+      return false;
     } finally {
       if (!isSilent) {
         setIsVerifyingPayment(false);
@@ -203,41 +250,48 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   const handlePlaceOrder = () => {
     if (!customerId) return;
 
+    const orderPayload = {
+      customer_id: customerId,
+      cart_id: cartId,
+      address_id: String(selectedAddress.id),
+      use_wallet: 0,
+      payment_type: paymentMethod === 'cash' ? 1 : 2,
+      promo_code: appliedPromoCode || undefined,
+    };
+
     placeOrder(
-      {
-        customer_id: customerId,
-        cart_id: cartId,
-        address_id: String(selectedAddress.id),
-        use_wallet: 0,
-        payment_type: paymentMethod === 'cash' ? 1 : 2,
-        promo_code: appliedPromoCode || undefined,
-      },
+      orderPayload,
       {
         onSuccess: response => {
-          console.log('Place Order API Response:', JSON.stringify(response, null, 2));
           if (response.requires_payment && response.data?.payment_url) {
             setCreatedOrderId(response.data.order_id || null);
             setCreatedOrderUniqueId(response.data.unique_id || (response.data as any).temp_order_id || null);
+            setPaymentError(null);
+            setPaymentLoading(true);
+            hasHttpErrorRef.current = false;
+            paymentCompletedRef.current = false;
+            setWebViewKey(prev => prev + 1);
             setPaymentUrl(response.data.payment_url);
           } else {
             queryClient.invalidateQueries({ queryKey: ['cart'] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             
-            // Show toast from the API response
+            AsyncStorage.removeItem(`special_request_${cartId}`).catch(err => {
+              console.error('Failed to remove special request', err);
+            });
+
             Toast.show({
               type: 'success',
               text1: t('checkout.orderPlaced', 'Order Placed'),
               text2: response.message || 'Your order has been placed successfully!',
             });
 
-            // Redirect directly to the order screen
-            if (onGoToOrders) {
-              onGoToOrders(preorderDate);
-            }
+            const displayId = response.data?.unique_id || (response.data?.order_id ? String(response.data.order_id) : 'success');
+            setSuccessOrderId(displayId);
           }
         },
         onError: error => {
-          console.log('Place Order API Error:', error);
+          console.error('Failed to place order:', error);
         },
       },
     );
@@ -246,64 +300,30 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
   if (paymentUrl) {
     if (paymentError) {
       return (
-        <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: sw(32) }]}>
-          {/* Error Icon */}
-          <View style={[styles.successIconContainer, { backgroundColor: '#FF3B3015' }]}>
-            <Text style={[styles.successCheckmark, { color: '#FF3B30' }]}>✗</Text>
-          </View>
-
-          <Text style={[styles.successTitle, { color: colors.text }]}>
-            Payment Failed
-          </Text>
-
-          <Text style={[styles.successDescription, { color: colors.textMuted, textAlign: 'center', marginTop: sh(8) }]}>
-            {paymentError}
-          </Text>
-
-          {createdOrderUniqueId ? (
-            <View style={[styles.orderIdContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.orderIdLabel, { color: colors.textMuted }]}>Order ID</Text>
-              <Text style={[styles.orderIdValue, { color: colors.text }]}>#{createdOrderUniqueId}</Text>
-            </View>
-          ) : createdOrderId ? (
-            <View style={[styles.orderIdContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <Text style={[styles.orderIdLabel, { color: colors.textMuted }]}>Order ID</Text>
-              <Text style={[styles.orderIdValue, { color: colors.text }]}>#{createdOrderId}</Text>
-            </View>
-          ) : null}
-
-          <TouchableOpacity
-            style={[styles.successButton, { backgroundColor: colors.primary }]}
-            onPress={() => {
-              console.log('>>> [RETRY PAYMENT] Restarting WebView payment flow for URL:', paymentUrl);
-              setWebViewKey(prev => prev + 1);
-              setPaymentError(null);
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.successButtonText}>Retry Payment</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.successButtonSecondary, { borderColor: colors.primary }]}
-            onPress={() => {
-              console.log('>>> [CANCEL PAYMENT FLOW] Returning to checkout form.');
-              setPaymentError(null);
-              setPaymentUrl('');
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.successButtonSecondaryText, { color: colors.primary }]}>
-              Back to Checkout
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <PaymentFailedView
+          paymentError={paymentError}
+          createdOrderUniqueId={createdOrderUniqueId}
+          createdOrderId={createdOrderId}
+          onRetryPayment={() => {
+            setPaymentLoading(true);
+            hasHttpErrorRef.current = false;
+            paymentCompletedRef.current = false;
+            setWebViewKey(prev => prev + 1);
+            setPaymentError(null);
+          }}
+          onBackToCheckout={() => {
+            setPaymentError(null);
+            setPaymentLoading(true);
+            hasHttpErrorRef.current = false;
+            paymentCompletedRef.current = false;
+            setPaymentUrl('');
+          }}
+        />
       );
     }
 
     const injectedScript = `
       (function() {
-        // Ensure viewport metadata is set for mobile screens to scale correctly
         try {
           var meta = document.createElement('meta');
           meta.name = 'viewport';
@@ -312,7 +332,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         } catch(e) {}
 
         try {
-          const bodyContent = document.body.innerText;
+          var bodyContent = document.body.innerText;
           window.ReactNativeWebView.postMessage(bodyContent);
         } catch(e) {}
         true;
@@ -320,7 +340,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     `;
 
     const handlePaymentSuccess = (orderId: number | null, uniqueId: string | null = null) => {
-      console.log('>>> [PAYMENT HANDLER SUCCESS] orderId:', orderId, 'uniqueId:', uniqueId);
+      paymentCompletedRef.current = true;
       setPaymentUrl('');
       setPaymentError(null);
       Toast.show({
@@ -330,8 +350,12 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       });
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+
+      AsyncStorage.removeItem(`special_request_${cartId}`).catch(err => {
+        console.error('Failed to remove special request', err);
+      });
+
       const displayId = uniqueId || (orderId && orderId === createdOrderId ? createdOrderUniqueId : null) || (orderId ? String(orderId) : null) || createdOrderUniqueId || 'success';
-      console.log('>>> [PAYMENT HANDLER SUCCESS] displayId resolved to:', displayId);
       
       setCreatedOrderId(null);
       setCreatedOrderUniqueId(null);
@@ -340,7 +364,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
     const handlePaymentFailure = (message?: string) => {
       const errMsg = message || 'The payment process was unsuccessful or canceled.';
-      console.log('>>> [PAYMENT HANDLER FAILURE] Error message:', errMsg);
+      paymentCompletedRef.current = true;
       setPaymentError(errMsg);
       Toast.show({
         type: 'error',
@@ -352,24 +376,47 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     const onMessageHandler = (event: any) => {
       try {
         const rawData = event.nativeEvent.data;
-        console.log('>>> [WEBVIEW MESSAGE] Raw data received:', rawData);
-        const d = JSON.parse(rawData);
-        console.log('>>> [WEBVIEW MESSAGE] Parsed JSON data:', d);
-        if (d.success === true) {
-          const orderIdNum = d.order_id || createdOrderId;
-          const uniqueId = d.unique_id || null;
-          handlePaymentSuccess(orderIdNum, uniqueId);
-        } else if (d.success === false) {
-          handlePaymentFailure(d.message || d.error);
+        let d: any;
+        try {
+          d = JSON.parse(rawData);
+        } catch (error) {
+          return;
+        }
+
+        if (d && typeof d === 'object') {
+          const innerData = d.data;
+          if (innerData && typeof innerData === 'object' && ('status' in innerData || 'payment_status' in innerData)) {
+            const statusVal = (innerData.status || innerData.payment_status || '').toString().toLowerCase();
+            const orderUniqueId = innerData.order_unique_id || innerData.unique_id || createdOrderUniqueId;
+            const orderIdNum = innerData.order_id || innerData.id || createdOrderId;
+
+            if (statusVal === 'paid' || statusVal === 'success') {
+              handlePaymentSuccess(orderIdNum, orderUniqueId);
+            } else {
+              handlePaymentFailure(d.message || `Payment status: ${innerData.status || innerData.payment_status}`);
+            }
+          } else if (d.status === 'success') {
+            const orderUniqueId = d.data?.order_id || d.unique_id || null;
+            const orderIdNum = d.order_id || d.data?.order_id || createdOrderId;
+            handlePaymentSuccess(orderIdNum, orderUniqueId || createdOrderUniqueId);
+          } else if (d.status === 'failed') {
+            handlePaymentFailure(d.message || 'Payment failed');
+          } else if (d.success === true && !d.status) {
+            const orderIdNum = d.order_id || createdOrderId;
+            const uniqueId = d.unique_id || null;
+            handlePaymentSuccess(orderIdNum, uniqueId || createdOrderUniqueId);
+          } else if (d.success === false) {
+            handlePaymentFailure(d.message || d.error);
+          }
         }
       } catch (error) {
-        console.log('>>> [WEBVIEW MESSAGE] Parse error (Non-JSON message ignored):', error);
+        console.error('Error in message handler:', error);
       }
     };
 
-    const handleNavigationStateChange = (navState: any) => {
+    const handleNavigationStateChange = async (navState: any) => {
       const { url } = navState;
-      console.log('>>> [WEBVIEW NAVIGATION] URL:', url);
+      currentUrlRef.current = url;
 
       const isFailure =
         url.includes('fail') ||
@@ -379,53 +426,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         url.includes('success=false') ||
         url.includes('status=failed');
 
-      const isSuccess =
-        (url.includes('/success') || url.includes('success=true') || url.includes('/callback')) &&
-        !isFailure;
-
-      console.log('>>> [WEBVIEW NAVIGATION STATE] isSuccess:', isSuccess, 'isFailure:', isFailure);
-
-      // Extract all query parameters for developer logging
-      const queryParams: Record<string, string> = {};
-      try {
-        const queryPart = url.split('?')[1];
-        if (queryPart) {
-          const pairs = queryPart.split('&');
-          pairs.forEach((pair: string) => {
-            const [key, val] = pair.split('=');
-            if (key) {
-              queryParams[decodeURIComponent(key)] = val ? decodeURIComponent(val) : '';
-            }
-          });
-        }
-      } catch (err) {}
-
-      console.log('>>> [DEVELOPER PAYMENT LOG] callback data:', JSON.stringify({
-        url: url,
-        extractedParams: queryParams,
-        isSuccess: isSuccess,
-        isFailure: isFailure,
-        tempOrderId: createdOrderUniqueId
-      }, null, 2));
-
-      if (isSuccess) {
-        const match =
-          url.match(/[?&]unique_id=([^&#]*)/) ||
-          url.match(/[?&]trackingId=([^&#]*)/) ||
-          url.match(/[?&]order_id=([^&#]*)/);
-        const orderIdString = match ? match[1] : '';
-        const orderIdNum = orderIdString ? parseInt(orderIdString, 10) : createdOrderId;
-        
-        let uniqueId: string | null = null;
-        const uniqueIdMatch = url.match(/[?&]unique_id=([^&#]*)/);
-        if (uniqueIdMatch) {
-          uniqueId = uniqueIdMatch[1];
-        }
-
-        const parsedOrderId = (orderIdNum !== null && !isNaN(orderIdNum)) ? orderIdNum : null;
-        handlePaymentSuccess(parsedOrderId, uniqueId);
-      } else if (isFailure) {
-        // Extract failure reason if present in URL query params
+      if (isFailure && !navState.loading) {
         const reasonMatch = url.match(/[?&](?:message|error|reason)=([^&#]*)/);
         const reason = reasonMatch ? decodeURIComponent(reasonMatch[1]) : undefined;
         handlePaymentFailure(reason);
@@ -436,7 +437,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <Header
           title={t('checkout.title')}
-          onBack={() => setPaymentUrl('')}
+          onBack={() => {
+            setPaymentError(null);
+            setPaymentLoading(true);
+            hasHttpErrorRef.current = false;
+            paymentCompletedRef.current = false;
+            setPaymentUrl('');
+          }}
           containerStyle={{
             backgroundColor: colors.background,
             paddingBottom: sh(16),
@@ -444,15 +451,76 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
           }}
         />
         <WebView
+          ref={webViewRef}
           key={webViewKey}
           style={{ flex: 1 }}
           source={{ uri: paymentUrl }}
-          onLoadStart={() => setPaymentLoading(true)}
-          onLoadEnd={() => setPaymentLoading(false)}
+          onLoadStart={() => {
+            setPaymentLoading(true);
+            hasHttpErrorRef.current = false;
+          }}
+          onLoadEnd={() => {
+            setPaymentLoading(false);
+            const currentUrl = currentUrlRef.current;
+            const isCallback =
+              (currentUrl.includes('/success') || currentUrl.includes('success=true') || currentUrl.includes('/callback')) &&
+              !currentUrl.includes('fail') && !currentUrl.includes('error') && !currentUrl.includes('cancel');
+
+            if (isCallback && webViewRef.current) {
+              webViewRef.current.injectJavaScript(`
+                setTimeout(function() {
+                  window.ReactNativeWebView.postMessage(document.body.innerText);
+                }, 500);
+                true;
+              `);
+
+              // Fallback if JSON parsing fails or backend is slow
+              setTimeout(async () => {
+                if (!paymentCompletedRef.current && !hasHttpErrorRef.current) {
+                  const verified = await handleVerifyPayment(createdOrderId, createdOrderUniqueId, true);
+                  if (verified) {
+                    handlePaymentSuccess(createdOrderId, createdOrderUniqueId);
+                  } else {
+                    hasHttpErrorRef.current = true;
+                    handlePaymentFailure('The payment process was unsuccessful or canceled.');
+                  }
+                }
+              }, 4000);
+            }
+          }}
           injectedJavaScript={injectedScript}
           onMessage={onMessageHandler}
           onNavigationStateChange={handleNavigationStateChange}
           scalesPageToFit={true}
+          onError={(syntheticEvent) => {
+            hasHttpErrorRef.current = true;
+            handlePaymentFailure('The payment process was unsuccessful or canceled.');
+          }}
+          onHttpError={async (syntheticEvent) => {
+            const { nativeEvent } = syntheticEvent;
+            const errorUrl = nativeEvent.url || '';
+            const statusCode = nativeEvent.statusCode;
+
+            if (statusCode >= 400) {
+              const isCallbackUrl =
+                errorUrl.includes('/success') ||
+                errorUrl.includes('success=true') ||
+                errorUrl.includes('/callback');
+
+              if (isCallbackUrl) {
+                hasHttpErrorRef.current = true; // prevent default success flow
+                setPaymentLoading(true);
+                const verified = await handleVerifyPayment(createdOrderId, createdOrderUniqueId, true);
+                if (verified) {
+                  handlePaymentSuccess(createdOrderId, createdOrderUniqueId);
+                  return;
+                }
+              }
+
+              hasHttpErrorRef.current = true;
+              handlePaymentFailure('The payment process was unsuccessful or canceled.');
+            }
+          }}
         />
         {paymentLoading && (
           <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255,255,255,0.7)' }]}>
@@ -465,49 +533,14 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
 
   if (successOrderId !== null) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center', paddingHorizontal: sw(32) }]}>
-        {/* Success Icon */}
-        <View style={[styles.successIconContainer, { backgroundColor: colors.primary + '15' }]}>
-          <Text style={[styles.successCheckmark, { color: colors.primary }]}>✓</Text>
-        </View>
-
-        <Text style={[styles.successTitle, { color: colors.text }]}>
-          Order Placed Successfully!
-        </Text>
-
-        <Text style={[styles.successDescription, { color: colors.textMuted }]}>
-          Your order has been received and is being processed.
-        </Text>
-
-        {successOrderId && successOrderId !== 'success' && !successOrderId.startsWith('TEMP_') && (
-          <View style={[styles.orderIdContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.orderIdLabel, { color: colors.textMuted }]}>Order ID</Text>
-            <Text style={[styles.orderIdValue, { color: colors.text }]}>#{successOrderId}</Text>
-          </View>
-        )}
-
-        <TouchableOpacity
-          style={[styles.successButton, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            onGoToOrders ? onGoToOrders(preorderDate) : (onOrderPlaced ? onOrderPlaced() : onBack());
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.successButtonText}>View Orders</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.successButtonSecondary, { borderColor: colors.primary }]}
-          onPress={() => {
-            onGoToHome ? onGoToHome() : onBack();
-          }}
-          activeOpacity={0.8}
-        >
-          <Text style={[styles.successButtonSecondaryText, { color: colors.primary }]}>
-            Go to Home
-          </Text>
-        </TouchableOpacity>
-      </View>
+      <OrderSuccessView
+        successOrderId={successOrderId}
+        preorderDate={preorderDate}
+        onGoToOrders={onGoToOrders}
+        onOrderPlaced={onOrderPlaced}
+        onBack={onBack}
+        onGoToHome={onGoToHome}
+      />
     );
   }
 
@@ -1000,80 +1033,6 @@ const styles = StyleSheet.create({
     fontSize: fs(15),
     fontWeight: '500',
     textDecorationLine: 'underline',
-  },
-  successIconContainer: {
-    width: sw(96),
-    height: sw(96),
-    borderRadius: sw(48),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: sh(28),
-  },
-  successCheckmark: {
-    fontSize: fs(44),
-    fontWeight: 'bold',
-  },
-  successTitle: {
-    fontSize: fs(24),
-    fontWeight: '700',
-    marginBottom: sh(12),
-    textAlign: 'center',
-  },
-  successDescription: {
-    fontSize: fs(15),
-    textAlign: 'center',
-    lineHeight: fs(22),
-    marginBottom: sh(32),
-  },
-  orderIdContainer: {
-    width: '100%',
-    paddingVertical: sh(16),
-    paddingHorizontal: sw(24),
-    borderRadius: sw(12),
-    borderWidth: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: sh(40),
-  },
-  orderIdLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
-  },
-  orderIdValue: {
-    fontSize: fs(16),
-    fontWeight: '700',
-  },
-  successButton: {
-    width: '100%',
-    height: sh(52),
-    borderRadius: sw(26),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: sh(12),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  successButtonText: {
-    color: '#FFFFFF',
-    fontSize: fs(16),
-    fontWeight: '600',
-  },
-  successButtonSecondary: {
-    width: '100%',
-    height: sh(52),
-    borderRadius: sw(26),
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: sh(24),
-  },
-  successButtonSecondaryText: {
-    fontSize: fs(16),
-    fontWeight: '600',
   },
 });
 

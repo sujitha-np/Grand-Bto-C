@@ -344,13 +344,6 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
       const deliveryDate = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}`;
       const deliveryTime = `${pad(selectedHour)}:${pad(selectedMinute)}`;
 
-      console.log('[CalendarScreen] handleCheckout - validating with parameters:', {
-        customer_id: customerId,
-        cart_id: cartId,
-        delivery_date: deliveryDate,
-        delivery_time: deliveryTime,
-      });
-
       validateCheckout(
         {
           customer_id: String(customerId),
@@ -360,7 +353,6 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
         },
         {
           onSuccess: res => {
-            console.log('[CalendarScreen] validateCheckout onSuccess:', res);
             if (
               res &&
               !res.success &&

@@ -107,11 +107,6 @@ function HomeScreen({
   const categories = categoriesData?.data || [];
   const offers = offersData?.data || [];
 
-  console.log('HomeScreen - isLoadingOffers:', isLoadingOffers);
-  console.log('HomeScreen - offersData:', offersData);
-  console.log('HomeScreen - offers:', offers);
-  console.log('HomeScreen - offers length:', offers.length);
-
   // Determine which products to show based on search state
   const products =
     searchText.trim() !== ''

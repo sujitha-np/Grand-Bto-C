@@ -82,8 +82,6 @@ export const addressService = {
   ): Promise<SavedAddressResponse> => {
     try {
       const token = await AsyncStorage.getItem('userToken');
-      console.log('Address API - Token:', token ? 'Found' : 'NOT FOUND');
-      console.log('Address API - Customer ID:', customerId);
 
       if (!customerId) {
         return {
@@ -94,7 +92,6 @@ export const addressService = {
       }
 
       const url = `${BASE_URL}/api/customer/address/list/${customerId}`;
-      console.log('Address API - Making request to:', url);
 
       const response = await fetch(url, {
         method: 'GET',
@@ -107,8 +104,6 @@ export const addressService = {
       });
 
       const data = await response.json();
-      console.log('Address API - Response:', data);
-      console.log('Address API - Status:', response.status);
 
       // 404 means no addresses found - treat as empty list, not error
       if (response.status === 404) {

@@ -64,6 +64,8 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   } = useCart(customerId, preorderDate);
 
   const isCartLoading = !customerIdLoaded || isLoading;
+  const cartData = (cartResponse?.data as any)?.cart;
+  const items = cartData?.items || [];
   const { mutate: updateQuantity } = useUpdateCartQuantity();
   const { mutate: removeFromCart } = useRemoveFromCart();
   const { mutate: saveSpecialRequest } = useSpecialRequest();
@@ -71,15 +73,27 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   const [specialRequest, setSpecialRequest] = useState<string>('');
 
   useEffect(() => {
-    if (cartResponse?.data) {
-      const cartSpecialRequest =
-        (cartResponse.data as any)?.cart?.special_request ||
-        (cartResponse.data as any)?.special_request;
-      if (cartSpecialRequest !== undefined && cartSpecialRequest !== null) {
-        setSpecialRequest(cartSpecialRequest);
+    const loadPersistedSpecialRequest = async () => {
+      if (cartData?.cart_id) {
+        try {
+          const persisted = await AsyncStorage.getItem(`special_request_${cartData.cart_id}`);
+          if (persisted !== null) {
+            setSpecialRequest(persisted);
+          } else if (cartResponse?.data) {
+            const cartSpecialRequest =
+              (cartResponse.data as any)?.cart?.special_request ||
+              (cartResponse.data as any)?.special_request;
+            if (cartSpecialRequest !== undefined && cartSpecialRequest !== null) {
+              setSpecialRequest(cartSpecialRequest);
+            }
+          }
+        } catch (e) {
+          console.error('Failed to load persisted special request', e);
+        }
       }
-    }
-  }, [cartResponse]);
+    };
+    loadPersistedSpecialRequest();
+  }, [cartData?.cart_id, cartResponse]);
 
   useEffect(() => {
     if (cartResponse !== undefined) {
@@ -93,8 +107,6 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
     }
   }, [cartResponse, isError, error]);
 
-  const cartData = (cartResponse?.data as any)?.cart;
-  const items = cartData?.items || [];
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -250,12 +262,21 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
                         specialRequest: text,
                       },
                       {
-                        onSuccess: (data) => {
-                          if (data.success && data.data?.special_request !== undefined) {
-                            setSpecialRequest(data.data.special_request || '');
-                          } else {
-                            setSpecialRequest(text);
+                        onSuccess: async (data) => {
+                          const updatedText = (data.success && data.data?.special_request !== undefined)
+                            ? (data.data.special_request || '')
+                            : text;
+
+                          try {
+                            if (updatedText.trim() === '') {
+                              await AsyncStorage.removeItem(`special_request_${cartData.cart_id}`);
+                            } else {
+                              await AsyncStorage.setItem(`special_request_${cartData.cart_id}`, updatedText);
+                            }
+                          } catch (e) {
+                            console.error('Failed to save special request to storage', e);
                           }
+                          setSpecialRequest(updatedText);
                         },
                       }
                     );
@@ -269,7 +290,6 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
             <OrderSummary
               colors={colors}
               subtotal={cartData?.subtotal || 0}
-              delivery={0}
               total={cartData?.total_amount || 0}
             />
           )}

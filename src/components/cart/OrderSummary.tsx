@@ -6,14 +6,12 @@ import { Images } from '../../assets/images';
 interface OrderSummaryProps {
   colors: any;
   subtotal: number;
-  delivery: number;
   total: number;
 }
 
 export default function OrderSummary({
   colors,
   subtotal,
-  delivery,
   total,
 }: OrderSummaryProps) {
   return (
@@ -49,25 +47,6 @@ export default function OrderSummary({
           ]}
         >
           {subtotal.toFixed(2)} QAR
-        </Text>
-      </View>
-
-      <View style={styles.row}>
-        <Text
-          style={[
-            styles.label,
-            { color: colors.textMuted, fontFamily: colors.fontRegular },
-          ]}
-        >
-          Delivery
-        </Text>
-        <Text
-          style={[
-            styles.value,
-            { color: colors.text, fontFamily: colors.fontRegular },
-          ]}
-        >
-          {delivery.toFixed(2)} QAR
         </Text>
       </View>
     </View>

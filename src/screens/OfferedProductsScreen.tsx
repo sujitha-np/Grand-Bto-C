@@ -81,7 +81,7 @@ function OfferedProductsScreen({
       Toast.show({
         type: 'success',
         text1: 'Added to Cart',
-        text2: `${product.name_en} - $${offerPrice}`,
+        text2: `${product.name_en} - ${parseFloat(offerPrice).toFixed(2)} QAR`,
       });
     } catch (err: any) {
       Toast.show({
@@ -110,9 +110,9 @@ function OfferedProductsScreen({
             {product.name_en}
           </Text>
           <View style={styles.priceContainer}>
-            <Text style={styles.offerPrice}>${item.offer_price}</Text>
+            <Text style={styles.offerPrice}>{parseFloat(item.offer_price).toFixed(2)} QAR</Text>
             {parseFloat(item.offer_price) < parseFloat(product.price) && (
-              <Text style={styles.originalPrice}>${product.price}</Text>
+              <Text style={styles.originalPrice}>{parseFloat(product.price).toFixed(2)} QAR</Text>
             )}
           </View>
           <TouchableOpacity

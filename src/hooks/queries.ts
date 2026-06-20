@@ -147,11 +147,7 @@ export const useCart = (customerId?: string, preorderDate?: string) => {
     queryKey: ['cart', customerId, preorderDate],
     queryFn: async () => {
       if (!customerId || !preorderDate) return { data: { carts: [] } };
-      console.log(
-        `Fetching cart for customer ${customerId} on ${preorderDate}...`,
-      );
       const data = await cartService.getCart(customerId, preorderDate);
-      console.log(`Cart fetched:`, data);
       return data;
     },
     enabled: !!customerId && !!preorderDate,

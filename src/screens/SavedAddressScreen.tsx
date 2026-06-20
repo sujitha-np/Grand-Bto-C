@@ -130,11 +130,6 @@ function SavedAddressScreen({
     });
   };
 
-  // Log for debugging
-  console.log('SavedAddressScreen - customerId:', customerId);
-  console.log('SavedAddressScreen - addresses:', addresses);
-  console.log('SavedAddressScreen - error:', error);
-
   if (!customerId) {
     return (
       <View style={styles.container}>

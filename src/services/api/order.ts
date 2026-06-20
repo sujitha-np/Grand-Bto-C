@@ -105,6 +105,7 @@ export const orderService = {
     customerId: string,
   ): Promise<OrderHistoryResponse> => {
     const token = await AsyncStorage.getItem('userToken');
+    
 
     const formData = new FormData();
     formData.append('customer_id', customerId);

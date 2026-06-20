@@ -63,12 +63,6 @@ function ProductsSection({
     [wishlistItems],
   );
 
-  // Debug logging
-  React.useEffect(() => {
-    console.log('Wishlist items:', wishlistItems);
-    console.log('Wishlist product IDs:', Array.from(wishlistProductIds));
-  }, [wishlistItems, wishlistProductIds]);
-
   useEffect(() => {
     const getCustomerId = async () => {
       const id = await AsyncStorage.getItem('customerId');
@@ -113,9 +107,6 @@ function ProductsSection({
         {products.map(product => {
           const imageUrl = `${BASE_URL}${product.image}`;
           const isInWishlist = wishlistProductIds.has(product.id);
-          console.log(
-            `Product ${product.id} (${product.name_en}): isInWishlist = ${isInWishlist}`,
-          );
           return (
             <TouchableOpacity
               key={product.id}

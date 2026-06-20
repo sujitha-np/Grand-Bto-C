@@ -68,6 +68,10 @@ export const checkoutService = {
     checkoutData: CheckoutRequest,
   ): Promise<CheckoutResponse> => {
     const token = await AsyncStorage.getItem('userToken');
+    console.log('\n======================================================');
+    console.log('🔑 [DEVELOPER] AUTH TOKEN FOR POSTMAN/API TESTING:');
+    console.log(token);
+    console.log('======================================================\n');
 
     const formData = new FormData();
     formData.append('customer_id', checkoutData.customer_id);
@@ -107,7 +111,6 @@ export const checkoutService = {
     payload: CartCheckoutRequest,
   ): Promise<CartCheckoutResponse> => {
     const token = await AsyncStorage.getItem('userToken');
-    console.log('[checkoutService.cartCheckout] token:', token, 'payload:', payload);
 
     const formData = new FormData();
     formData.append('customer_id', payload.customer_id);
@@ -127,7 +130,6 @@ export const checkoutService = {
     });
 
     const data = await response.json();
-    console.log('[checkoutService.cartCheckout] response status:', response.status, 'data:', data);
 
     if (!response.ok) {
       const error: any = new Error(
