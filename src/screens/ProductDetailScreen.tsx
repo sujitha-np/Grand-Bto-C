@@ -229,7 +229,7 @@ function ProductDetailScreen({
         )}
 
         {/* Add Ons Section */}
-        <View style={styles.section}>
+        {/* <View style={styles.section}>
           <View style={styles.addOnsHeader}>
             <Text
               style={[
@@ -337,7 +337,7 @@ function ProductDetailScreen({
               No add-ons available
             </Text>
           )}
-        </View>
+        </View> */}
 
 
         </View>
@@ -614,8 +614,8 @@ const createStyles = (colors: any, insets: any) =>
       gap: sw(20),
     },
     quantityButtonInline: {
-      width: sw(24),
-      height: sw(24),
+      width: sw(28),
+      height: sw(28),
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -628,7 +628,9 @@ const createStyles = (colors: any, insets: any) =>
       alignItems: 'center',
     },
     quantityButtonText: {
-      fontSize: fs(22),
+      fontSize: fs(20),
+      includeFontPadding: false,
+      textAlignVertical: 'center',
     },
     quantityText: {
       fontSize: fs(20),

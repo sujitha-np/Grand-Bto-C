@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { BASE_URL } from '../../constants/api';
 
 export interface CustomerProfile {
@@ -86,7 +87,7 @@ export const customerService = {
 
   updateProfile: async (
     customerId: string,
-    profileData: Partial<CustomerProfile>,
+    profileData: Partial<CustomerProfile> & { photo?: any },
   ): Promise<CustomerProfileResponse> => {
     try {
       const token = await AsyncStorage.getItem('userToken');
@@ -99,18 +100,61 @@ export const customerService = {
         ...profileData,
       });
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          Authorization: `bearer ${token}`,
-          bearer: `${token}`,
-        },
-        body: JSON.stringify({
+      let headers: any = {
+        Accept: 'application/json',
+        Authorization: `bearer ${token}`,
+        bearer: `${token}`,
+      };
+
+      let body: any;
+
+      // Check if photo is an object representing a local file to upload
+      const hasPhotoUpload =
+        profileData.photo &&
+        typeof profileData.photo === 'object' &&
+        profileData.photo.uri;
+
+      if (hasPhotoUpload) {
+        const formData = new FormData();
+        formData.append('customer_id', customerId);
+
+        if (profileData.name_en !== undefined) {
+          formData.append('name_en', profileData.name_en);
+        }
+        if (profileData.mobile !== undefined) {
+          formData.append('mobile', profileData.mobile);
+        }
+        if (profileData.email !== undefined) {
+          formData.append('email', profileData.email);
+        }
+        if (profileData.gender !== undefined) {
+          formData.append('gender', profileData.gender);
+        }
+        if (profileData.dob !== undefined) {
+          formData.append('dob', profileData.dob);
+        }
+
+        // Append photo
+        const uri = profileData.photo.uri;
+        formData.append('photo', {
+          uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+          name: profileData.photo.name || 'profile.png',
+          type: profileData.photo.type || 'image/png',
+        } as any);
+
+        body = formData;
+      } else {
+        headers['Content-Type'] = 'application/json';
+        body = JSON.stringify({
           customer_id: customerId,
           ...profileData,
-        }),
+        });
+      }
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body,
       });
 
       const data = await response.json();

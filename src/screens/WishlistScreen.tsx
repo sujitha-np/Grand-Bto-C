@@ -17,6 +17,7 @@ import { BASE_URL } from '../constants/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Images } from '../assets/images';
 import Header from '../components/common/Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface WishlistItem {
   product_id: number;
@@ -37,6 +38,7 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
+    const insets = useSafeAreaInsets();
 
   const { data: wishlistData, isLoading, error } = useWishlist(customerId);
   const { mutateAsync: removeFromWishlist } = useRemoveFromWishlist();
@@ -115,7 +117,7 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title="My Wishlist" onBack={onBack} />
+        <Header title="My Wishlist" onBack={onBack}     />
         <View style={styles.centerContainer}>
           <Text style={styles.errorText}>Failed to load wishlist</Text>
         </View>
@@ -125,7 +127,13 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="My Wishlist" onBack={onBack} />
+      <Header title="My Wishlist" onBack={onBack} 
+      containerStyle={{
+                  backgroundColor: colors.background,
+                  paddingBottom: sh(16),
+                  paddingTop: insets.top + sh(12),
+                }}
+                />
 
       <FlatList
         data={wishlistItems}
@@ -155,7 +163,7 @@ const createStyles = (colors: any) =>
     container: {
       flex: 1,
       backgroundColor: colors.background,
-      marginTop: sh(30),
+      // marginTop: sh(30),
     },
     centerContainer: {
       flex: 1,

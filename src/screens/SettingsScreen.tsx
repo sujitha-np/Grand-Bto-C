@@ -20,6 +20,7 @@ import { fs, sw, sh } from '../utils/responsive';
 import { Images } from '../assets/images';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addressService } from '../services/api/address';
+import { Header } from '../components/common';
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -75,7 +76,8 @@ function SettingsScreen({ onBack, onNavigateToAddresses }: SettingsScreenProps) 
       />
 
       {/* Header */}
-      <View style={styles.header}>
+      <Header title={t('settings.title')} onBack={onBack} />
+      {/* <View style={styles.header}>
         <TouchableOpacity
           onPress={onBack}
           style={styles.backBtn}
@@ -85,7 +87,7 @@ function SettingsScreen({ onBack, onNavigateToAddresses }: SettingsScreenProps) 
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('settings.title')}</Text>
         <View style={styles.headerSpacer} />
-      </View>
+      </View> */}
 
       <View style={styles.menuList}>
         {/* Saved Address */}

@@ -17,6 +17,8 @@ import { BASE_URL } from '../constants/api';
 import { Product } from '../services/api/product';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import Header from '../components/common/Header';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 interface OfferedProductsScreenProps {
   offerId: number;
@@ -40,7 +42,7 @@ function OfferedProductsScreen({
   const { data, isLoading, error } = useOfferedProducts(offerId);
 
   const offeredProducts = data?.data || [];
-
+    const insets = useSafeAreaInsets();
   useEffect(() => {
     const getCustomerId = async () => {
       const id = await AsyncStorage.getItem('customerId');
@@ -149,13 +151,11 @@ function OfferedProductsScreen({
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backButtonText}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{offerName}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <Header title={offerName} onBack={onBack}    containerStyle={{
+                        backgroundColor: colors.background,
+                        paddingBottom: sh(16),
+                        paddingTop: insets.top + sh(12),
+                      }} />
 
       <FlatList
         data={offeredProducts}
@@ -248,13 +248,12 @@ const createStyles = (colors: any) =>
       color: colors.text,
       fontFamily: colors.fontSemiBold,
       marginBottom: sh(8),
-      minHeight: sh(36),
     },
     priceContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: sh(10),
-      gap: sw(8),
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      marginBottom: sh(12),
+      gap: sh(2),
     },
     offerPrice: {
       fontSize: fs(16),
@@ -294,3 +293,4 @@ const createStyles = (colors: any) =>
   });
 
 export default OfferedProductsScreen;
+

@@ -293,6 +293,7 @@ const createStyles = (colors: any) =>
     priceWrapper: {
       flexDirection: 'row',
       alignItems: 'center',
+      flexWrap: 'wrap',
       gap: sw(6),
     },
     priceRow: {

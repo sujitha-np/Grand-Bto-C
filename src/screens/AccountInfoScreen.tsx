@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -16,9 +17,12 @@ import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { Images } from '../assets/images';
 import InputField from '../components/common/InputField';
+import CustomDatePicker from '../components/common/CustomDatePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCustomerProfile, useUpdateCustomerProfile } from '../hooks/queries';
 import Button from '../components/common/Button';
+import { BASE_URL } from '../constants/api';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 
 interface AccountInfoScreenProps {
   onBack: () => void;
@@ -41,6 +45,93 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
   const [dob, setDob] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [genderOpen, setGenderOpen] = useState(false);
+  const [dobOpen, setDobOpen] = useState(false);
+  const [selectedPhoto, setSelectedPhoto] = useState<{
+    uri: string;
+    name: string;
+    type: string;
+  } | null>(null);
+
+  const handleTakePhoto = () => {
+    launchCamera(
+      {
+        mediaType: 'photo',
+        includeBase64: false,
+        maxHeight: 500,
+        maxWidth: 500,
+        quality: 0.8,
+      },
+      response => {
+        if (response.didCancel) {
+          console.log('User cancelled camera');
+        } else if (response.errorMessage) {
+          console.log('Camera Error: ', response.errorMessage);
+          Alert.alert('Error', response.errorMessage);
+        } else if (response.assets && response.assets.length > 0) {
+          const asset = response.assets[0];
+          if (asset.uri) {
+            setSelectedPhoto({
+              uri: asset.uri,
+              name: asset.fileName || 'profile.png',
+              type: asset.type || 'image/png',
+            });
+          }
+        }
+      },
+    );
+  };
+
+  const handleChooseFromLibrary = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        includeBase64: false,
+        maxHeight: 500,
+        maxWidth: 500,
+        quality: 0.8,
+      },
+      response => {
+        if (response.didCancel) {
+          console.log('User cancelled image picker');
+        } else if (response.errorMessage) {
+          console.log('ImagePicker Error: ', response.errorMessage);
+          Alert.alert('Error', response.errorMessage);
+        } else if (response.assets && response.assets.length > 0) {
+          const asset = response.assets[0];
+          if (asset.uri) {
+            setSelectedPhoto({
+              uri: asset.uri,
+              name: asset.fileName || 'profile.png',
+              type: asset.type || 'image/png',
+            });
+          }
+        }
+      },
+    );
+  };
+
+  const handleAvatarPress = () => {
+    if (!isEditing) return;
+
+    Alert.alert(
+      t('accountInfo.changePhotoTitle', 'Change Profile Photo'),
+      t('accountInfo.changePhotoMessage', 'Select an option to update your profile photo'),
+      [
+        {
+          text: t('accountInfo.takePhoto', 'Take Photo'),
+          onPress: handleTakePhoto,
+        },
+        {
+          text: t('accountInfo.chooseLibrary', 'Choose from Library'),
+          onPress: handleChooseFromLibrary,
+        },
+        {
+          text: t('common.cancel', 'Cancel'),
+          style: 'cancel',
+        },
+      ],
+    );
+  };
 
   // Fetch customer profile
   const { data: profileData, isLoading } = useCustomerProfile(customerId);
@@ -87,11 +178,13 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
           email,
           gender,
           dob,
+          ...(selectedPhoto ? { photo: selectedPhoto } : {}),
         },
       },
       {
         onSuccess: () => {
           setIsEditing(false);
+          setSelectedPhoto(null);
           onBack();
         },
       },
@@ -118,7 +211,19 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
           <Text style={styles.headerTitle}>{t('accountInfo.title')}</Text>
         </View>
         <TouchableOpacity
-          onPress={() => setIsEditing(!isEditing)}
+          onPress={() => {
+            if (isEditing) {
+              setSelectedPhoto(null);
+              if (profile) {
+                setName(profile.name_en || '');
+                setPhone(profile.mobile || '');
+                setEmail(profile.email || '');
+                setGender(profile.gender || 'male');
+                setDob(profile.dob || '');
+              }
+            }
+            setIsEditing(!isEditing);
+          }}
           style={styles.editBtn}
           activeOpacity={0.7}
         >
@@ -141,6 +246,49 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Profile Photo / Initial Circle */}
+            <TouchableOpacity
+              activeOpacity={isEditing ? 0.8 : 1}
+              onPress={handleAvatarPress}
+              style={styles.avatarWrapper}
+              disabled={!isEditing}
+            >
+              <View style={styles.avatarContainer}>
+                {selectedPhoto ? (
+                  <Image
+                    source={{ uri: selectedPhoto.uri }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                ) : profile?.photo ? (
+                  <Image
+                    source={{
+                      uri: profile.photo.startsWith('http')
+                        ? profile.photo
+                        : profile.photo.startsWith('/')
+                        ? `${BASE_URL}${profile.photo}`
+                        : `${BASE_URL}/${profile.photo}`,
+                    }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Text style={styles.avatarInitial}>
+                    {(name || email || 'U').trim().charAt(0).toUpperCase()}
+                  </Text>
+                )}
+                {isEditing && (
+                  <View style={styles.avatarEditBadge}>
+                    <Image
+                      source={Images.edit}
+                      style={styles.avatarEditIcon}
+                      resizeMode="contain"
+                    />
+                  </View>
+                )}
+              </View>
+            </TouchableOpacity>
+
             {/* Name */}
             <InputField
               label={t('accountInfo.name')}
@@ -224,16 +372,26 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
             </View>
 
             {/* DOB */}
-            <InputField
-              label={t('accountInfo.dob')}
-              placeholder={t('accountInfo.dobPlaceholder')}
-              value={dob}
-              onChangeText={setDob}
-              editable={isEditing}
-              leftIcon={Images.calendar}
-              containerStyle={styles.fieldWrapper}
-              inputContainerStyle={styles.fieldContainer}
-            />
+            <TouchableOpacity
+              activeOpacity={isEditing ? 0.8 : 1}
+              onPress={() => {
+                if (isEditing) {
+                  setDobOpen(true);
+                }
+              }}
+            >
+              <View pointerEvents="none">
+                <InputField
+                  label={t('accountInfo.dob')}
+                  placeholder={t('accountInfo.dobPlaceholder')}
+                  value={dob}
+                  editable={false}
+                  leftIcon={Images.calendar}
+                  containerStyle={styles.fieldWrapper}
+                  inputContainerStyle={styles.fieldContainer}
+                />
+              </View>
+            </TouchableOpacity>
           </ScrollView>
 
           {/* Save Button - shows when editing */}
@@ -247,6 +405,16 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
               />
             </View>
           )}
+
+          <CustomDatePicker
+            visible={dobOpen}
+            onClose={() => setDobOpen(false)}
+            onSelect={date => {
+              setDob(date);
+              setDobOpen(false);
+            }}
+            selectedDate={dob}
+          />
         </>
       )}
     </View>
@@ -318,6 +486,58 @@ const createStyles = (colors: any, insets: any) =>
       paddingHorizontal: sw(20),
       paddingTop: sh(16),
       paddingBottom: sh(40),
+    },
+    avatarWrapper: {
+      alignItems: 'center',
+      marginBottom: sh(24),
+    },
+    avatarContainer: {
+      width: sw(80),
+      height: sw(80),
+      borderRadius: sw(50),
+      backgroundColor: colors.primaryLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: colors.primary,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    avatarImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: sw(50),
+    },
+    avatarInitial: {
+      fontSize: fs(36),
+      color: colors.primary,
+      fontFamily: colors.fontBold,
+    },
+    avatarEditBadge: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      width: sw(26),
+      height: sw(26),
+      borderRadius: sw(13),
+      backgroundColor: colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: colors.background,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 3,
+    },
+    avatarEditIcon: {
+      width: sw(12),
+      height: sw(12),
+      tintColor: '#FFFFFF',
     },
     fieldWrapper: {
       marginBottom: sh(14),

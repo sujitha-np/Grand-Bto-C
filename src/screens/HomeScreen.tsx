@@ -63,6 +63,9 @@ function HomeScreen({
   const [showAddressModal, setShowAddressModal] = useState(false);
   const { mutateAsync: addToCart } = useAddToCart();
 
+  const scrollViewRef = React.useRef<ScrollView>(null);
+  const [productsSectionY, setProductsSectionY] = useState(0);
+
   // Fetch default address
   const { data: defaultAddressData } = useDefaultAddress(customerId);
   const defaultAddress = defaultAddressData?.data;
@@ -85,6 +88,8 @@ function HomeScreen({
 
     loadCustomerId();
   }, []);
+
+
 
   const {
     data: departmentsData,
@@ -109,7 +114,7 @@ function HomeScreen({
 
   // Determine which products to show based on search state
   const products =
-    searchText.trim() !== ''
+    searchText.trim().length >= 2
       ? searchProductsData?.data || []
       : selectedDepartmentId
       ? deptProductsData?.products || deptProductsData?.data || []
@@ -154,7 +159,7 @@ function HomeScreen({
       refetchOffers(),
       refetchProducts(),
       selectedDepartmentId ? refetchDeptProducts() : Promise.resolve(),
-      searchText.trim() !== '' ? refetchSearchProducts() : Promise.resolve(),
+      searchText.trim().length >= 2 ? refetchSearchProducts() : Promise.resolve(),
     ]);
     setRefreshing(false);
   };
@@ -164,6 +169,7 @@ function HomeScreen({
       <StatusBar barStyle="light-content" backgroundColor="#FF8A00" />
 
       <ScrollView
+        ref={scrollViewRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
@@ -237,21 +243,42 @@ function HomeScreen({
 
           {/* Search Bar */}
           <View style={styles.searchBar}>
-            <Image
-              source={Images.search}
-              style={styles.searchIconImage}
-              resizeMode="contain"
-            />
+            <TouchableOpacity
+              onPress={() => {
+                if (searchText.trim().length >= 2 && productsSectionY > 0) {
+                  scrollViewRef.current?.scrollTo({
+                    y: productsSectionY,
+                    animated: true,
+                  });
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <Image
+                source={Images.search}
+                style={styles.searchIconImage}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
             <TextInput
               style={styles.searchInput}
               placeholder={t('home.searchPlaceholder')}
               placeholderTextColor={colors.textPlaceholder}
               value={searchText}
+              returnKeyType="search"
               onChangeText={text => {
                 setSearchText(text);
                 // Clear department selection when searching
                 if (text.trim() !== '' && selectedDepartmentId) {
                   setSelectedDepartmentId(undefined);
+                }
+              }}
+              onSubmitEditing={() => {
+                if (searchText.trim().length >= 2 && productsSectionY > 0) {
+                  scrollViewRef.current?.scrollTo({
+                    y: productsSectionY,
+                    animated: true,
+                  });
                 }
               }}
             />
@@ -275,35 +302,42 @@ function HomeScreen({
         />
 
         {/* Products Section */}
-        <ProductsSection
-          products={products}
-          onProductPress={handleProductPress}
-          onAddPress={async product => {
-            const customerId = await AsyncStorage.getItem('customerId');
-            const token = await AsyncStorage.getItem('userToken');
-            console.log('Customer ID:', customerId);
-            console.log('Token:', token);
-            if (customerId) {
-              const today = new Date().toISOString().split('T')[0];
-              try {
-                await addToCart({
-                  customerId,
-                  productId: product.id.toString(),
-                  quantity: '1',
-                  preorderDate: today,
-                });
-                if (onShowCart) onShowCart();
-              } catch (err: any) {
-                Toast.show({
-                  type: 'error',
-                  text1: 'Add to cart failed',
-                  text2: err?.message || 'Unknown error',
-                  visibilityTime: 5000,
-                });
-              }
-            }
+        <View
+          onLayout={event => {
+            const { y } = event.nativeEvent.layout;
+            setProductsSectionY(y);
           }}
-        />
+        >
+          <ProductsSection
+            products={products}
+            onProductPress={handleProductPress}
+            onAddPress={async product => {
+              const customerId = await AsyncStorage.getItem('customerId');
+              const token = await AsyncStorage.getItem('userToken');
+              console.log('Customer ID:', customerId);
+              console.log('Token:', token);
+              if (customerId) {
+                const today = new Date().toISOString().split('T')[0];
+                try {
+                  await addToCart({
+                    customerId,
+                    productId: product.id.toString(),
+                    quantity: '1',
+                    preorderDate: today,
+                  });
+                  if (onShowCart) onShowCart();
+                } catch (err: any) {
+                  Toast.show({
+                    type: 'error',
+                    text1: 'Add to cart failed',
+                    text2: err?.message || 'Unknown error',
+                    visibilityTime: 5000,
+                  });
+                }
+              }
+            }}
+          />
+        </View>
       </ScrollView>
 
       {/* Address Details Modal */}

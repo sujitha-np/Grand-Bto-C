@@ -22,6 +22,7 @@ import {
   useLoyaltyPoints,
   usePromocodes,
 } from '../hooks/queries';
+import { BASE_URL } from '../constants/api';
 
 interface AccountScreenProps {
   onLogout: () => void;
@@ -123,8 +124,27 @@ function AccountScreen({
           <View style={styles.profileRow}>
             <View style={styles.profileLeft}>
               <View style={styles.avatarContainer}>
-                {/* Placeholder for actual avatar */}
-                <Image source={Images.account} style={styles.avatar} />
+                {profile?.photo ? (
+                  <Image
+                    source={{
+                      uri: profile.photo.startsWith('http')
+                        ? profile.photo
+                        : profile.photo.startsWith('/')
+                        ? `${BASE_URL}${profile.photo}`
+                        : `${BASE_URL}/${profile.photo}`,
+                    }}
+                    style={styles.avatar}
+                  />
+                ) : (
+                  <View style={styles.avatarInitialContainer}>
+                    <Text style={styles.avatarInitial}>
+                      {(profile?.name_en || profile?.email || 'U')
+                        .trim()
+                        .charAt(0)
+                        .toUpperCase()}
+                    </Text>
+                  </View>
+                )}
               </View>
               {profileLoading ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -261,6 +281,18 @@ const createStyles = (colors: any, insets: any) =>
     avatar: {
       width: '100%',
       height: '100%',
+    },
+    avatarInitialContainer: {
+      width: '100%',
+      height: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.primaryLight,
+    },
+    avatarInitial: {
+      fontSize: fs(20),
+      color: colors.primary,
+      fontFamily: colors.fontBold,
     },
     profileName: {
       fontSize: fs(20),

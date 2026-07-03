@@ -5,9 +5,11 @@ import {
   TouchableOpacity,
   View,
   ViewStyle,
+  Image,
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
+import { Images } from '../../assets/images';
 
 interface HeaderProps {
   title: string;
@@ -30,16 +32,13 @@ function Header({
         <TouchableOpacity
           onPress={onBack}
           style={[styles.backBtn, { backgroundColor: colors.background }]}
-          activeOpacity={0.7}
+          // activeOpacity={0.7}
         >
-          <Text
-            style={[
-              styles.backIcon,
-              { color: colors.text, fontFamily: colors.fontBold },
-            ]}
-          >
-            {'<'}
-          </Text>
+          <Image
+            source={Images.backArrow1}
+            style={[styles.backIcon, { tintColor: colors.text }]}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
       ) : null}
       <Text
@@ -75,8 +74,8 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   backIcon: {
-    fontSize: fs(16),
-    fontFamily: 'Manrope-Bold',
+    width: sw(15),
+    height: sw(12),
   },
   headerTitle: {
     fontSize: fs(18),
