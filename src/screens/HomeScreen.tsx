@@ -325,7 +325,6 @@ function HomeScreen({
                     quantity: '1',
                     preorderDate: today,
                   });
-                  if (onShowCart) onShowCart();
                 } catch (err: any) {
                   Toast.show({
                     type: 'error',

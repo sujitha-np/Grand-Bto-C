@@ -8,7 +8,6 @@ import {
   Text,
   View,
   Keyboard,
-  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -20,22 +19,18 @@ import { authService } from '../services/api/auth';
 import { Images } from '../assets/images';
 import Toast from 'react-native-toast-message';
 
-interface LoginScreenProps {
+interface ForgotPasswordScreenProps {
   onBack: () => void;
-  onLogin: (customerId: number) => void;
-  onForgotPassword?: () => void;
 }
 
-function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
+function ForgotPasswordScreen({ onBack }: ForgotPasswordScreenProps) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const colors = useTheme();
 
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | undefined>();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
@@ -62,49 +57,40 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
     [colors, insets],
   );
 
-  const handleLogin = async () => {
-    const loginId = email.trim() || phone.trim();
-    if (!loginId) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: t(
-          'login.emailOrPhoneRequired',
-          'Please enter email or phone number',
-        ),
-      });
+  const handleSubmit = async () => {
+    setError(undefined);
+
+    const emailTrimmed = email.trim();
+    if (!emailTrimmed) {
+      setError(t('forgotPasswordScreen.required', 'Email is required'));
       return;
     }
-    if (!password) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: t('login.passwordRequired', 'Please enter password'),
-      });
+
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      setError(t('forgotPasswordScreen.invalidEmail', 'Please enter a valid email address'));
       return;
     }
 
     setLoading(true);
     try {
-      const data = await authService.sendOtp(loginId, password);
+      await authService.forgotPassword(emailTrimmed);
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'OTP sent successfully!',
+        text2: t('login.forgotPasswordSuccess', 'Password reset link sent to your email!'),
       });
-      onLogin(data?.customer_id);
-    } catch (error: any) {
+      onBack();
+    } catch (err: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: error.message || 'Login failed',
+        text2: err.message || 'Failed to request password reset',
       });
     } finally {
       setLoading(false);
     }
   };
-
-
 
   return (
     <KeyboardAvoidingView
@@ -117,7 +103,7 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
         backgroundColor={colors.background}
       />
 
-      <Header title={t('login.title')} onBack={onBack} />
+      <Header title={t('forgotPasswordScreen.title')} onBack={onBack} />
 
       <ScrollView
         style={styles.flex}
@@ -128,68 +114,29 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.pageTitle}>{t('login.enterDetails')}</Text>
+        <Text style={styles.pageTitle}>{t('forgotPasswordScreen.enterEmail')}</Text>
 
         <InputField
-          label={t('login.email')}
-          placeholder={t('login.emailPlaceholder')}
+          label={t('forgotPasswordScreen.email')}
+          placeholder={t('forgotPasswordScreen.emailPlaceholder')}
           value={email}
-          onChangeText={setEmail}
+          onChangeText={(val) => {
+            setEmail(val);
+            if (error) setError(undefined);
+          }}
           keyboardType="email-address"
           autoCapitalize="none"
           leftIcon={Images.mail}
           containerStyle={styles.fieldWrapper}
           inputContainerStyle={styles.fieldContainer}
+          error={error}
         />
 
-        {/* Or divider */}
-        <View style={styles.orContainer}>
-          <View style={styles.orLine} />
-          <Text style={styles.orText}>{t('login.or')}</Text>
-          <View style={styles.orLine} />
-        </View>
-
-        <InputField
-          maxLength={8}
-          label={t('login.phone')}
-          placeholder={t('login.phonePlaceholder')}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          leftIcon={Images.call}
-          containerStyle={styles.fieldWrapper}
-          inputContainerStyle={styles.fieldContainer}
-        />
-
-        <InputField
-          label={t('login.password')}
-          placeholder={t('login.passwordPlaceholder')}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry={!showPassword}
-          autoCapitalize="none"
-          leftIcon={Images.password}
-          rightIcon={Images.eye}
-          onRightIconPress={() => setShowPassword(v => !v)}
-          containerStyle={styles.fieldWrapper}
-          inputContainerStyle={styles.fieldContainer}
-        />
-
-        <TouchableOpacity
-          onPress={onForgotPassword}
-          style={styles.forgotPasswordWrapper}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.forgotPasswordText}>
-            {t('login.forgotPassword')}
-          </Text>
-        </TouchableOpacity>
-
-        {/* Continue button */}
+        {/* Submit button */}
         <View style={styles.btnContainer}>
           <Button
-            label={t('login.continue')}
-            onPress={handleLogin}
+            label={t('forgotPasswordScreen.submit')}
+            onPress={handleSubmit}
             loading={loading}
             variant="primary"
           />
@@ -212,44 +159,18 @@ const createStyles = (colors: any, insets: any) =>
     },
     scrollContent: {
       paddingHorizontal: sw(20),
-      paddingTop: sh(4),
+      paddingTop: sh(10),
       paddingBottom: sh(40),
     },
     pageTitle: {
-      fontSize: fs(32),
-      lineHeight: fs(40),
+      fontSize: fs(24),
+      lineHeight: fs(32),
       marginBottom: sh(24),
       color: colors.text,
       fontFamily: colors.fontMedium,
     },
-    orContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: sh(14),
-    },
-    orLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: colors.borderSubtle,
-    },
-    orText: {
-      fontSize: fs(14),
-      marginHorizontal: sw(12),
-      color: colors.textMuted,
-      fontFamily: colors.fontRegular,
-    },
     btnContainer: {
-      paddingTop: sh(8),
-    },
-    forgotPasswordWrapper: {
-      alignSelf: 'flex-end',
-      marginTop: sh(2),
-      marginBottom: sh(16),
-    },
-    forgotPasswordText: {
-      fontSize: fs(14),
-      color: colors.primary,
-      fontFamily: colors.fontMedium,
+      paddingTop: sh(16),
     },
     fieldWrapper: {
       marginBottom: sh(14),
@@ -260,4 +181,4 @@ const createStyles = (colors: any, insets: any) =>
     },
   });
 
-export default LoginScreen;
+export default ForgotPasswordScreen;

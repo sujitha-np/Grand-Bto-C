@@ -42,7 +42,14 @@
     "next": "التالي",
     "male": "ذكر",
     "female": "أنثى",
-    "other": "آخر"
+    "other": "آخر",
+    "nameRequired": "الاسم مطلوب",
+    "phoneRequired": "رقم الهاتف مطلوب",
+    "dobRequired": "تاريخ الميلاد مطلوب",
+    "emailRequired": "البريد الإلكتروني مطلوب",
+    "emailInvalid": "يرجى إدخال بريد إلكتروني صحيح",
+    "passwordRequired": "كلمة المرور مطلوبة",
+    "passwordLength": "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل"
   },
   "login": {
     "title": "تسجيل الدخول",
@@ -54,7 +61,19 @@
     "phonePlaceholder": "رقم الهاتف",
     "password": "كلمة المرور",
     "passwordPlaceholder": "********",
+    "forgotPassword": "هل نسيت كلمة المرور؟",
+    "forgotPasswordEmailRequired": "يرجى إدخال بريدك الإلكتروني لإعادة تعيين كلمة المرور",
+    "forgotPasswordSuccess": "تم إرسال رابط إعادة تعيين كلمة المرور إلى بريدك الإلكتروني!",
     "continue": "متابعة"
+  },
+  "forgotPasswordScreen": {
+    "title": "نسيت كلمة المرور",
+    "enterEmail": "أدخل بريدك الإلكتروني لإعادة تعيين كلمة المرور.",
+    "email": "البريد الإلكتروني",
+    "emailPlaceholder": "أدخل بريدك الإلكتروني",
+    "submit": "إرسال رابط إعادة التعيين",
+    "required": "البريد الإلكتروني مطلوب",
+    "invalidEmail": "يرجى إدخال بريد إلكتروني صحيح"
   },
   "otp": {
     "title": "رمز التحقق",
@@ -86,7 +105,21 @@
     "settings": "الإعدادات",
     "about": "حول",
     "help": "مساعدة",
-    "logout": "تسجيل خروج"
+    "logout": "تسجيل خروج",
+    "resetPassword": "إعادة تعيين كلمة المرور"
+  },
+  "resetPassword": {
+    "title": "إعادة تعيين كلمة المرور",
+    "newPassword": "كلمة المرور الجديدة",
+    "newPasswordPlaceholder": "أدخل كلمة المرور الجديدة",
+    "confirmPassword": "تأكيد كلمة المرور",
+    "confirmPasswordPlaceholder": "أعد إدخال كلمة المرور الجديدة",
+    "submit": "إعادة تعيين كلمة المرور",
+    "success": "تمت إعادة تعيين كلمة المرور بنجاح!",
+    "mismatch": "كلمتا المرور غير متطابقتين",
+    "lengthError": "يجب أن تتكون كلمة المرور من 8 أحرف على الأقل",
+    "required": "هذا الحقل مطلوب",
+    "error": "فشلت إعادة تعيين كلمة المرور. يرجى المحاولة مرة أخرى."
   },
   "accountInfo": {
     "title": "معلومات الحساب",

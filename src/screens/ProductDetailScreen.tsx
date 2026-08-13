@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Image,
@@ -9,14 +10,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { BASE_URL } from '../constants/api';
 import { ProductDetail } from '../services/api/product';
 import { Images } from '../assets/images';
-import { useAddons } from '../hooks/queries';
-import { Addon } from '../services/api/addons';
+import { useAddons, useWishlist, useAddToWishlist, useRemoveFromWishlist } from '../hooks/queries';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProductDetailScreenProps {
   product: ProductDetail;
@@ -29,15 +29,65 @@ function ProductDetailScreen({
   onBack,
   onAddToCart,
 }: ProductDetailScreenProps) {
-  const { t } = useTranslation();
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [quantity, setQuantity] = useState(1);
   const [selectedAddons, setSelectedAddons] = useState<number[]>([]);
   const { data: addonsData, isLoading: addonsLoading } = useAddons();
-  const addons = addonsData?.data || [];
+  const addons = React.useMemo(() => addonsData?.data || [], [addonsData]);
 
   const scrollViewRef = useRef<ScrollView>(null);
+  const [customerId, setCustomerId] = useState<string | undefined>();
+  const { data: wishlistData } = useWishlist(customerId);
+  const { mutateAsync: addToWishlist } = useAddToWishlist();
+  const { mutateAsync: removeFromWishlist } = useRemoveFromWishlist();
+
+  useEffect(() => {
+    const getCustomerId = async () => {
+      const id = await AsyncStorage.getItem('customerId');
+      if (id) setCustomerId(id);
+    };
+    getCustomerId();
+  }, []);
+
+  const wishlistItems = React.useMemo(() => {
+    if (!wishlistData) return [];
+    if (Array.isArray(wishlistData.data)) {
+      return wishlistData.data;
+    }
+    if (wishlistData.data?.items && Array.isArray(wishlistData.data.items)) {
+      return wishlistData.data.items;
+    }
+    return [];
+  }, [wishlistData]);
+
+  const isInWishlist = React.useMemo(
+    () => wishlistItems.some((item: any) => item.product_id === product.id),
+    [wishlistItems, product.id],
+  );
+
+  const handleWishlistToggle = async () => {
+    if (!customerId) {
+      console.log('No customerId, cannot toggle wishlist');
+      return;
+    }
+
+    try {
+      if (isInWishlist) {
+        await removeFromWishlist({
+          customerId,
+          productId: product.id.toString(),
+        });
+      } else {
+        await addToWishlist({
+          customerId,
+          productId: product.id.toString(),
+        });
+      }
+    } catch (error) {
+      console.log('Wishlist toggle error:', error);
+    }
+  };
 
   useEffect(() => {
     console.log('Addons Data:', addonsData);
@@ -129,15 +179,31 @@ function ProductDetailScreen({
                 resizeMode="contain"
               />
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.shareButton, { backgroundColor: colors.card }]}
-            >
-              <Image
-                source={Images.share}
-                style={styles.shareIcon}
-                resizeMode="contain"
-              />
-            </TouchableOpacity>
+            <View style={styles.rightActions}>
+              <TouchableOpacity
+                style={[styles.favoriteButton, { backgroundColor: colors.card }]}
+                onPress={handleWishlistToggle}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={isInWishlist ? Images.heartFilled : Images.heart}
+                  style={[
+                    styles.favoriteIcon,
+                    isInWishlist && { tintColor: colors.primary },
+                  ]}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.shareButton, { backgroundColor: colors.card }]}
+              >
+                <Image
+                  source={Images.share}
+                  style={styles.shareIcon}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -271,7 +337,7 @@ function ProductDetailScreen({
               style={{ marginTop: sh(10) }}
             />
           ) : addons.length > 0 ? (
-            addons.map((addon: Addon) => (
+            addons.map((addon) => (
               <TouchableOpacity
                 key={addon.id}
                 style={styles.addonItem}
@@ -467,6 +533,28 @@ const createStyles = (colors: any, insets: any) =>
     shareIcon: {
       width: sw(20),
       height: sw(20),
+    },
+    rightActions: {
+      flexDirection: 'row',
+      gap: sw(10),
+    },
+    favoriteButton: {
+      width: sw(40),
+      height: sw(40),
+      borderRadius: sw(20),
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      backgroundColor: colors.card,
+    },
+    favoriteIcon: {
+      width: sw(20),
+      height: sw(20),
+      tintColor: colors.textMuted,
     },
     scrollView: {
       flex: 1,

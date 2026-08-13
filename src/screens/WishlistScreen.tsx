@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import { useWishlist, useRemoveFromWishlist } from '../hooks/queries';
 import { fs, sw, sh } from '../utils/responsive';
@@ -34,7 +33,6 @@ interface WishlistScreenProps {
 }
 
 function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
-  const { t } = useTranslation();
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
@@ -94,7 +92,7 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
           activeOpacity={0.7}
         >
           <Image
-            source={Images.heart}
+            source={Images.heartFilled}
             style={styles.heartIcon}
             resizeMode="contain"
           />

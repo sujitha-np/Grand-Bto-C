@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, StyleSheet, Text, TouchableOpacity, View, ScrollView } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
 
@@ -56,6 +56,20 @@ export default function CustomDatePicker({
 
   // Default to today for all modes
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [showYearPicker, setShowYearPicker] = useState(false);
+
+  useEffect(() => {
+    if (!visible) {
+      setShowYearPicker(false);
+    }
+  }, [visible]);
+
+  const startYear = maxDate.getFullYear();
+  const endYear = minDateRestriction.getFullYear();
+  const yearsList = [];
+  for (let y = startYear; y >= endYear; y--) {
+    yearsList.push(y);
+  }
 
   useEffect(() => {
     if (visible) {
@@ -185,111 +199,163 @@ export default function CustomDatePicker({
           ]}
         >
           <View style={styles.header}>
-            <TouchableOpacity
-              onPress={prevYear}
-              style={[styles.navBtn, isPrevYearDisabled() && { opacity: 0.3 }]}
-              disabled={isPrevYearDisabled()}
-            >
-              <Text style={[styles.navText, { color: colors.textMuted }]}>
-                {'<<'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={prevMonth}
-              style={[styles.navBtn, isPrevMonthDisabled() && { opacity: 0.3 }]}
-              disabled={isPrevMonthDisabled()}
-            >
-              <Text style={[styles.navText, { color: colors.textMuted }]}>
-                {'<'}
-              </Text>
-            </TouchableOpacity>
+            {!showYearPicker && (
+              <>
+                <TouchableOpacity
+                  onPress={prevYear}
+                  style={[styles.navBtn, isPrevYearDisabled() && { opacity: 0.3 }]}
+                  disabled={isPrevYearDisabled()}
+                >
+                  <Text style={[styles.navText, { color: colors.textMuted }]}>
+                    {'<<'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={prevMonth}
+                  style={[styles.navBtn, isPrevMonthDisabled() && { opacity: 0.3 }]}
+                  disabled={isPrevMonthDisabled()}
+                >
+                  <Text style={[styles.navText, { color: colors.textMuted }]}>
+                    {'<'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
 
-            <View style={styles.headerTitle}>
+            <TouchableOpacity
+              onPress={() => setShowYearPicker(!showYearPicker)}
+              style={styles.headerTitle}
+              activeOpacity={0.7}
+            >
               <Text style={[styles.titleText, { color: colors.text }]}>
-                {MONTHS[month]} {year}
+                {MONTHS[month]} {year} {showYearPicker ? '▲' : '▼'}
               </Text>
-            </View>
+            </TouchableOpacity>
 
-            <TouchableOpacity
-              onPress={nextMonth}
-              style={[styles.navBtn, isNextMonthDisabled() && { opacity: 0.3 }]}
-              disabled={isNextMonthDisabled()}
-            >
-              <Text style={[styles.navText, { color: colors.textMuted }]}>
-                {'>'}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={nextYear}
-              style={[styles.navBtn, isNextYearDisabled() && { opacity: 0.3 }]}
-              disabled={isNextYearDisabled()}
-            >
-              <Text style={[styles.navText, { color: colors.textMuted }]}>
-                {'>>'}
-              </Text>
-            </TouchableOpacity>
+            {!showYearPicker && (
+              <>
+                <TouchableOpacity
+                  onPress={nextMonth}
+                  style={[styles.navBtn, isNextMonthDisabled() && { opacity: 0.3 }]}
+                  disabled={isNextMonthDisabled()}
+                >
+                  <Text style={[styles.navText, { color: colors.textMuted }]}>
+                    {'>'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={nextYear}
+                  style={[styles.navBtn, isNextYearDisabled() && { opacity: 0.3 }]}
+                  disabled={isNextYearDisabled()}
+                >
+                  <Text style={[styles.navText, { color: colors.textMuted }]}>
+                    {'>>'}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
 
-          <View style={styles.weekDays}>
-            {DAYS.map((d, i) => (
-              <Text
-                key={i}
-                style={[styles.weekDayText, { color: colors.textMuted }]}
+          {showYearPicker ? (
+            <View style={styles.yearPickerContainer}>
+              <ScrollView
+                style={styles.yearPickerScroll}
+                contentContainerStyle={styles.yearPickerContent}
+                showsVerticalScrollIndicator={true}
               >
-                {d}
-              </Text>
-            ))}
-          </View>
-
-          <View style={styles.daysGrid}>
-            {days.map((day, index) => {
-              if (day === null) {
-                return <View key={index} style={styles.dayCell} />;
-              }
-
-              const selected = isSelected(day);
-              const disabled = isDayDisabled(day);
-              const todayFlag = isToday(day);
-
-              return (
-                <View key={index} style={styles.dayCell}>
-                  <TouchableOpacity
-                    style={[
-                      styles.dayButton,
-                      todayFlag && {
-                        borderWidth: 1.5,
-                        borderColor: colors.primary,
-                      },
-                      selected && {
-                        backgroundColor: colors.primary,
-                        borderWidth: 0,
-                      },
-                      disabled && { opacity: 0.3 },
-                    ]}
-                    onPress={() => handleDayPress(day)}
-                    disabled={disabled}
-                  >
-                    <Text
+                {yearsList.map(y => {
+                  const isSelectedYear = y === year;
+                  return (
+                    <TouchableOpacity
+                      key={y}
                       style={[
-                        styles.dayText,
-                        { color: colors.text },
-                        todayFlag && {
-                          color: colors.primary,
-                          fontFamily: 'Inter-Bold',
-                        },
-                        selected && {
-                          color: '#FFFFFF',
-                          fontFamily: 'Inter-Bold',
-                        },
+                        styles.yearItem,
+                        isSelectedYear && { backgroundColor: colors.primary },
                       ]}
+                      onPress={() => {
+                        setCurrentDate(new Date(y, month, 1));
+                        setShowYearPicker(false);
+                      }}
+                      activeOpacity={0.7}
                     >
-                      {day}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })}
-          </View>
+                      <Text
+                        style={[
+                          styles.yearItemText,
+                          { color: colors.text },
+                          isSelectedYear && { color: '#FFFFFF', fontFamily: 'Inter-Bold' },
+                        ]}
+                      >
+                        {y}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ) : (
+            <>
+              <View style={styles.weekDays}>
+                {DAYS.map((d, i) => (
+                  <Text
+                    key={i}
+                    style={[styles.weekDayText, { color: colors.textMuted }]}
+                  >
+                    {d}
+                  </Text>
+                ))}
+              </View>
+
+              <View style={styles.daysGrid}>
+                {days.map((day, index) => {
+                  if (day === null) {
+                    return <View key={index} style={styles.dayCell} />;
+                  }
+
+                  const selected = isSelected(day);
+                  const disabled = isDayDisabled(day);
+                  const todayFlag = isToday(day);
+
+                  return (
+                    <View key={index} style={styles.dayCell}>
+                      <TouchableOpacity
+                        style={[
+                          styles.dayButton,
+                          todayFlag && {
+                            borderWidth: 1.5,
+                            borderColor: colors.primary,
+                          },
+                          selected && {
+                            backgroundColor: colors.primary,
+                            borderWidth: 0,
+                          },
+                          disabled && { opacity: 0.3 },
+                        ]}
+                        onPress={() => handleDayPress(day)}
+                        disabled={disabled}
+                      >
+                        <Text
+                          style={[
+                            styles.dayText,
+                            { color: colors.text },
+                            todayFlag && {
+                              color: colors.primary,
+                              fontFamily: 'Inter-Bold',
+                            },
+                            selected && {
+                              color: '#FFFFFF',
+                              fontFamily: 'Inter-Bold',
+                            },
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
+            </>
+          )}
 
           <TouchableOpacity style={styles.cancelBtn} onPress={onClose}>
             <Text style={[styles.cancelText, { color: colors.primary }]}>
@@ -384,6 +450,26 @@ const styles = StyleSheet.create({
   todayText: {
     color: '#FFFFFF',
     fontFamily: 'Inter-Bold',
+  },
+  yearPickerContainer: {
+    height: sh(220),
+    marginVertical: sh(10),
+  },
+  yearPickerScroll: {
+    flex: 1,
+  },
+  yearPickerContent: {
+    paddingVertical: sh(5),
+  },
+  yearItem: {
+    paddingVertical: sh(12),
+    alignItems: 'center',
+    borderRadius: sw(8),
+    marginVertical: sh(2),
+  },
+  yearItemText: {
+    fontSize: fs(16),
+    fontFamily: 'Inter-Medium',
   },
   cancelBtn: {
     marginTop: sh(16),

@@ -42,7 +42,14 @@
     "next": "Next",
     "male": "Male",
     "female": "Female",
-    "other": "Other"
+    "other": "Other",
+    "nameRequired": "Name is required",
+    "phoneRequired": "Phone number is required",
+    "dobRequired": "Date of birth is required",
+    "emailRequired": "Email address is required",
+    "emailInvalid": "Please enter a valid email address",
+    "passwordRequired": "Password is required",
+    "passwordLength": "Password must be at least 6 characters"
   },
   "login": {
     "title": "Login",
@@ -54,7 +61,19 @@
     "phonePlaceholder": "Phone Number",
     "password": "Password",
     "passwordPlaceholder": "********",
+    "forgotPassword": "Forgot Password?",
+    "forgotPasswordEmailRequired": "Please enter your email to reset password",
+    "forgotPasswordSuccess": "Password reset link sent to your email!",
     "continue": "Continue"
+  },
+  "forgotPasswordScreen": {
+    "title": "Forgot Password",
+    "enterEmail": "Enter your email to reset your password.",
+    "email": "Email",
+    "emailPlaceholder": "Enter your email",
+    "submit": "Send Reset Link",
+    "required": "Email is required",
+    "invalidEmail": "Please enter a valid email address"
   },
   "otp": {
     "title": "OTP",
@@ -86,7 +105,21 @@
     "settings": "Settings",
     "about": "About",
     "help": "Help",
-    "logout": "Log out"
+    "logout": "Log out",
+    "resetPassword": "Reset Password"
+  },
+  "resetPassword": {
+    "title": "Reset Password",
+    "newPassword": "New Password",
+    "newPasswordPlaceholder": "Enter new password",
+    "confirmPassword": "Confirm Password",
+    "confirmPasswordPlaceholder": "Re-enter new password",
+    "submit": "Reset Password",
+    "success": "Password reset successfully!",
+    "mismatch": "Passwords do not match",
+    "lengthError": "Password must be at least 8 characters long",
+    "required": "This field is required",
+    "error": "Failed to reset password. Please try again."
   },
   "accountInfo": {
     "title": "Account Info",

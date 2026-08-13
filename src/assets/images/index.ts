@@ -20,6 +20,7 @@ export const Images = {
   eye: require('./eye.png'),
   gender: require('./gender.png'),
   heart: require('./heart.png'),
+  heartFilled: require('./heart_filled.png'),
   help: require('./help.png'),
   home: require('./home.png'),
   homeActive: require('./home_active.png'),

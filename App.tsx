@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   BackHandler,
   I18nManager,
@@ -28,6 +28,8 @@ import HomeScreen from './src/screens/HomeScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import AccountInfoScreen from './src/screens/AccountInfoScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
+import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import OrderHistoryScreen from './src/screens/OrderHistoryScreen';
 import LoyaltyPointsScreen from './src/screens/LoyaltyPointsScreen';
@@ -107,7 +109,8 @@ type Screen =
   | 'register'
   | 'login'
   | 'otp'
-  | 'home';
+  | 'home'
+  | 'forgotPassword';
 
 function App() {
   return (
@@ -125,17 +128,24 @@ function App() {
 function AppContent() {
   const [screen, setScreen] = useState<Screen>('splash');
   const [customerId, setCustomerId] = useState<number | null>(null);
+  const screenRef = useRef(screen);
+
+  useEffect(() => {
+    screenRef.current = screen;
+  }, [screen]);
 
   useEffect(() => {
     const unsubscribe = authEvents.subscribe(() => {
-      setCustomerId(null);
-      setScreen('welcome');
-      queryClient.clear();
-      Toast.show({
-        type: 'error',
-        text1: 'Session Expired',
-        text2: 'Please log in again.',
-      });
+      if (screenRef.current === 'home') {
+        setCustomerId(null);
+        setScreen('welcome');
+        queryClient.clear();
+        Toast.show({
+          type: 'error',
+          text1: 'Session Expired',
+          text2: 'Please log in again.',
+        });
+      }
     });
     return unsubscribe;
   }, []);
@@ -166,6 +176,10 @@ function AppContent() {
         return true;
       }
       if (screen === 'otp') {
+        setScreen('login');
+        return true;
+      }
+      if (screen === 'forgotPassword') {
         setScreen('login');
         return true;
       }
@@ -205,6 +219,15 @@ function AppContent() {
           setCustomerId(id);
           setScreen('otp');
         }}
+        onForgotPassword={() => setScreen('forgotPassword')}
+      />
+    );
+  }
+
+  if (screen === 'forgotPassword') {
+    return (
+      <ForgotPasswordScreen
+        onBack={() => setScreen('login')}
       />
     );
   }
@@ -277,7 +300,8 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
         subScreen === 'orderHistory' ||
         subScreen === 'loyaltyPoints' ||
         subScreen === 'wishlist' ||
-        subScreen === 'cart'
+        subScreen === 'cart' ||
+        subScreen === 'resetPassword'
       ) {
         setSubScreen(null);
         return true;
@@ -336,6 +360,10 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
 
   if (subScreen === 'accountInfo') {
     return <AccountInfoScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  if (subScreen === 'resetPassword') {
+    return <ResetPasswordScreen onBack={() => setSubScreen(null)} />;
   }
 
   if (subScreen === 'settings') {
@@ -435,7 +463,7 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
                 text2: `${quantity}x ${selectedProduct.name_en}`,
               });
               setSelectedProduct(null);
-              setSubScreen('cart');
+              setSubScreen(null);
             } catch (err: any) {
               Toast.show({
                 type: 'error',
@@ -583,6 +611,7 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
               setSubScreen('loyaltyPoints');
             }}
             onCoupons={() => setSubScreen('coupons')}
+            onResetPassword={() => setSubScreen('resetPassword')}
           />
         )}
       </View>

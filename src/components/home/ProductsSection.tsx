@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import {
   Image,
-  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Product } from '../../services/api/product';
@@ -32,7 +30,6 @@ function ProductsSection({
   onProductPress,
   onAddPress,
 }: ProductsSectionProps) {
-  const { t } = useTranslation();
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
@@ -126,7 +123,7 @@ function ProductsSection({
                   activeOpacity={0.7}
                 >
                   <Image
-                    source={Images.heart}
+                    source={isInWishlist ? Images.heartFilled : Images.heart}
                     style={[
                       styles.heartIcon,
                       isInWishlist && styles.heartIconFilled,

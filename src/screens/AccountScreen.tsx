@@ -7,8 +7,6 @@ import {
   ImageBackground,
   Image,
   TouchableOpacity,
-  SafeAreaView,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +30,7 @@ interface AccountScreenProps {
   onOrderHistory?: () => void;
   onLoyaltyPoints?: () => void;
   onCoupons?: () => void;
+  onResetPassword?: () => void;
 }
 
 function AccountScreen({
@@ -42,6 +41,7 @@ function AccountScreen({
   onOrderHistory,
   onLoyaltyPoints,
   onCoupons,
+  onResetPassword,
 }: AccountScreenProps) {
   const { t } = useTranslation();
   const colors = useTheme();
@@ -97,6 +97,7 @@ function AccountScreen({
     { id: '3', title: t('account.coupon'), icon: Images.coupon },
     { id: '4', title: t('account.orderHistory'), icon: Images.orderHistory },
     { id: '5', title: t('account.settings'), icon: Images.settings },
+    { id: '8', title: t('account.resetPassword'), icon: Images.lock },
     { id: '6', title: t('account.about'), icon: Images.about },
     { id: '7', title: t('account.help'), icon: Images.help },
   ];
@@ -214,6 +215,8 @@ function AccountScreen({
                   onOrderHistory && onOrderHistory();
                 } else if (item.id === '5') {
                   onSettings && onSettings();
+                } else if (item.id === '8') {
+                  onResetPassword && onResetPassword();
                 }
               }}
             >

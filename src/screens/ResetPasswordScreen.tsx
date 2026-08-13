@@ -8,7 +8,6 @@ import {
   Text,
   View,
   Keyboard,
-  TouchableOpacity,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -16,27 +15,43 @@ import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { Button, Header } from '../components/common';
 import InputField from '../components/common/InputField';
-import { authService } from '../services/api/auth';
+import { customerService } from '../services/api/customer';
 import { Images } from '../assets/images';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface LoginScreenProps {
+interface ResetPasswordScreenProps {
   onBack: () => void;
-  onLogin: (customerId: number) => void;
-  onForgotPassword?: () => void;
 }
 
-function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
+function ResetPasswordScreen({ onBack }: ResetPasswordScreenProps) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const colors = useTheme();
 
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [customerId, setCustomerId] = useState<string | undefined>();
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const [errors, setErrors] = useState<{ password?: string; confirmPassword?: string }>({});
+
+  useEffect(() => {
+    const loadCustomerId = async () => {
+      try {
+        const storedCustomerId = await AsyncStorage.getItem('customerId');
+        if (storedCustomerId) {
+          setCustomerId(storedCustomerId);
+        }
+      } catch (error) {
+        console.error('Error loading customerId:', error);
+      }
+    };
+    loadCustomerId();
+  }, []);
 
   useEffect(() => {
     const showSubscription = Keyboard.addListener(
@@ -62,49 +77,61 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
     [colors, insets],
   );
 
-  const handleLogin = async () => {
-    const loginId = email.trim() || phone.trim();
-    if (!loginId) {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: t(
-          'login.emailOrPhoneRequired',
-          'Please enter email or phone number',
-        ),
-      });
+  const handleResetPassword = async () => {
+    // Clear previous errors
+    setErrors({});
+    let hasError = false;
+    const newErrors: typeof errors = {};
+
+    if (!password) {
+      newErrors.password = t('resetPassword.required', 'This field is required');
+      hasError = true;
+    } else if (password.length < 8) {
+      newErrors.password = t('resetPassword.lengthError', 'Password must be at least 8 characters long');
+      hasError = true;
+    }
+
+    if (!confirmPassword) {
+      newErrors.confirmPassword = t('resetPassword.required', 'This field is required');
+      hasError = true;
+    } else if (password !== confirmPassword) {
+      newErrors.confirmPassword = t('resetPassword.mismatch', 'Passwords do not match');
+      hasError = true;
+    }
+
+    if (hasError) {
+      setErrors(newErrors);
       return;
     }
-    if (!password) {
+
+    if (!customerId) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: t('login.passwordRequired', 'Please enter password'),
+        text2: 'User session not found. Please log in again.',
       });
       return;
     }
 
     setLoading(true);
     try {
-      const data = await authService.sendOtp(loginId, password);
+      await customerService.resetPassword(customerId, password, confirmPassword);
       Toast.show({
         type: 'success',
         text1: 'Success',
-        text2: 'OTP sent successfully!',
+        text2: t('resetPassword.success', 'Password reset successfully!'),
       });
-      onLogin(data?.customer_id);
+      onBack();
     } catch (error: any) {
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: error.message || 'Login failed',
+        text2: error.message || t('resetPassword.error', 'Failed to reset password. Please try again.'),
       });
     } finally {
       setLoading(false);
     }
   };
-
-
 
   return (
     <KeyboardAvoidingView
@@ -117,7 +144,7 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
         backgroundColor={colors.background}
       />
 
-      <Header title={t('login.title')} onBack={onBack} />
+      <Header title={t('resetPassword.title')} onBack={onBack} />
 
       <ScrollView
         style={styles.flex}
@@ -128,44 +155,18 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.pageTitle}>{t('login.enterDetails')}</Text>
+        <Text style={styles.pageTitle}>{t('resetPassword.title')}</Text>
 
         <InputField
-          label={t('login.email')}
-          placeholder={t('login.emailPlaceholder')}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          leftIcon={Images.mail}
-          containerStyle={styles.fieldWrapper}
-          inputContainerStyle={styles.fieldContainer}
-        />
-
-        {/* Or divider */}
-        <View style={styles.orContainer}>
-          <View style={styles.orLine} />
-          <Text style={styles.orText}>{t('login.or')}</Text>
-          <View style={styles.orLine} />
-        </View>
-
-        <InputField
-          maxLength={8}
-          label={t('login.phone')}
-          placeholder={t('login.phonePlaceholder')}
-          value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
-          leftIcon={Images.call}
-          containerStyle={styles.fieldWrapper}
-          inputContainerStyle={styles.fieldContainer}
-        />
-
-        <InputField
-          label={t('login.password')}
-          placeholder={t('login.passwordPlaceholder')}
+          label={t('resetPassword.newPassword')}
+          placeholder={t('resetPassword.newPasswordPlaceholder')}
           value={password}
-          onChangeText={setPassword}
+          onChangeText={(val) => {
+            setPassword(val);
+            if (errors.password) {
+              setErrors(prev => ({ ...prev, password: undefined }));
+            }
+          }}
           secureTextEntry={!showPassword}
           autoCapitalize="none"
           leftIcon={Images.password}
@@ -173,23 +174,34 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
           onRightIconPress={() => setShowPassword(v => !v)}
           containerStyle={styles.fieldWrapper}
           inputContainerStyle={styles.fieldContainer}
+          error={errors.password}
         />
 
-        <TouchableOpacity
-          onPress={onForgotPassword}
-          style={styles.forgotPasswordWrapper}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.forgotPasswordText}>
-            {t('login.forgotPassword')}
-          </Text>
-        </TouchableOpacity>
+        <InputField
+          label={t('resetPassword.confirmPassword')}
+          placeholder={t('resetPassword.confirmPasswordPlaceholder')}
+          value={confirmPassword}
+          onChangeText={(val) => {
+            setConfirmPassword(val);
+            if (errors.confirmPassword) {
+              setErrors(prev => ({ ...prev, confirmPassword: undefined }));
+            }
+          }}
+          secureTextEntry={!showConfirmPassword}
+          autoCapitalize="none"
+          leftIcon={Images.password}
+          rightIcon={Images.eye}
+          onRightIconPress={() => setShowConfirmPassword(v => !v)}
+          containerStyle={styles.fieldWrapper}
+          inputContainerStyle={styles.fieldContainer}
+          error={errors.confirmPassword}
+        />
 
-        {/* Continue button */}
+        {/* Reset button */}
         <View style={styles.btnContainer}>
           <Button
-            label={t('login.continue')}
-            onPress={handleLogin}
+            label={t('resetPassword.submit')}
+            onPress={handleResetPassword}
             loading={loading}
             variant="primary"
           />
@@ -212,44 +224,18 @@ const createStyles = (colors: any, insets: any) =>
     },
     scrollContent: {
       paddingHorizontal: sw(20),
-      paddingTop: sh(4),
+      paddingTop: sh(10),
       paddingBottom: sh(40),
     },
     pageTitle: {
-      fontSize: fs(32),
-      lineHeight: fs(40),
+      fontSize: fs(28),
+      lineHeight: fs(36),
       marginBottom: sh(24),
       color: colors.text,
       fontFamily: colors.fontMedium,
     },
-    orContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: sh(14),
-    },
-    orLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: colors.borderSubtle,
-    },
-    orText: {
-      fontSize: fs(14),
-      marginHorizontal: sw(12),
-      color: colors.textMuted,
-      fontFamily: colors.fontRegular,
-    },
     btnContainer: {
-      paddingTop: sh(8),
-    },
-    forgotPasswordWrapper: {
-      alignSelf: 'flex-end',
-      marginTop: sh(2),
-      marginBottom: sh(16),
-    },
-    forgotPasswordText: {
-      fontSize: fs(14),
-      color: colors.primary,
-      fontFamily: colors.fontMedium,
+      paddingTop: sh(16),
     },
     fieldWrapper: {
       marginBottom: sh(14),
@@ -260,4 +246,4 @@ const createStyles = (colors: any, insets: any) =>
     },
   });
 
-export default LoginScreen;
+export default ResetPasswordScreen;

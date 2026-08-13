@@ -158,4 +158,46 @@ export const authService = {
       throw error;
     }
   },
+
+  forgotPassword: async (email: string) => {
+    const makeRequest = async (useJson: boolean) => {
+      if (useJson) {
+        return await apiClient.post('/customer/forgot-password', { email }, {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      } else {
+        const formData = new FormData();
+        formData.append('email', email);
+        return await apiClient.post('/customer/forgot-password', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+    };
+
+    try {
+      console.log('Forgot Password API - Attempting JSON request...');
+      let response = await makeRequest(true);
+      let data = response.data;
+      console.log('Forgot Password API - JSON response:', data);
+
+      if (data?.success === false || data?.error) {
+        console.log('Forgot Password API - JSON failed. Trying FormData fallback...');
+        const fbResponse = await makeRequest(false);
+        data = fbResponse.data;
+        console.log('Forgot Password API - FormData response:', data);
+      }
+
+      if (data?.success === false || data?.error) {
+        throw new Error(extractError(data, 'Failed to request password reset'));
+      }
+
+      return data;
+    } catch (error: any) {
+      console.log('Forgot Password API - Error:', error);
+      if (error.response?.data) {
+        throw new Error(extractError(error.response.data, 'Failed to request password reset'));
+      }
+      throw error;
+    }
+  },
 };
