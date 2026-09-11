@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Product } from '../../services/api/product';
+import { WorkingTimeResponse } from '../../services/api/settings';
 import { BASE_URL } from '../../constants/api';
 import {
   useWishlist,
@@ -16,6 +18,7 @@ import {
   useRemoveFromWishlist,
 } from '../../hooks/queries';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 import { Images } from '../../assets/images';
 
@@ -23,13 +26,18 @@ interface ProductsSectionProps {
   products: Product[];
   onProductPress?: (product: Product) => void;
   onAddPress?: (product: Product) => void;
+  isOpen?: boolean;
+  workingTime?: WorkingTimeResponse | null;
 }
 
 function ProductsSection({
   products,
   onProductPress,
   onAddPress,
+  isOpen = true,
+  workingTime,
 }: ProductsSectionProps) {
+  const { t } = useTranslation();
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
@@ -98,8 +106,48 @@ function ProductsSection({
     }
   };
 
+  const showClosedToast = () => {
+    Toast.show({
+      type: 'info',
+      text1: t('home.storeClosed'),
+      text2: t('home.storeClosedDesc', {
+        start:
+          workingTime?.working_time_start_formatted ||
+          workingTime?.working_time_start ||
+          '07:00 AM',
+        end:
+          workingTime?.working_time_end_formatted ||
+          workingTime?.working_time_end ||
+          '10:00 PM',
+      }),
+    });
+  };
+
   return (
     <View style={styles.container}>
+      {!isOpen && (
+        <View style={styles.closedBanner}>
+          <View style={styles.closedBannerContent}>
+            <View style={styles.closedBadgePill}>
+              <View style={styles.closedDot} />
+              <Text style={styles.closedPillText}>{t('home.storeClosed')}</Text>
+            </View>
+            <Text style={styles.closedBannerTitle}>
+              {t('home.storeClosedDesc', {
+                start:
+                  workingTime?.working_time_start_formatted ||
+                  workingTime?.working_time_start ||
+                  '07:00 AM',
+                end:
+                  workingTime?.working_time_end_formatted ||
+                  workingTime?.working_time_end ||
+                  '10:00 PM',
+              })}
+            </Text>
+          </View>
+        </View>
+      )}
+
       <View style={styles.gridContainer}>
         {products.map(product => {
           const imageUrl = `${BASE_URL}${product.image}`;
@@ -107,16 +155,41 @@ function ProductsSection({
           return (
             <TouchableOpacity
               key={product.id}
-              style={styles.productCard}
-              activeOpacity={0.8}
-              onPress={() => onProductPress?.(product)}
+              style={[
+                styles.productCard,
+                !isOpen && styles.productCardDisabled,
+              ]}
+              activeOpacity={isOpen ? 0.8 : 0.95}
+              onPress={() => {
+                if (!isOpen) {
+                  showClosedToast();
+                  return;
+                }
+                onProductPress?.(product);
+              }}
             >
               <View style={styles.imageWrapper}>
                 <Image
                   source={{ uri: imageUrl }}
-                  style={styles.productImage}
+                  style={[
+                    styles.productImage,
+                    !isOpen && styles.productImageDisabled,
+                  ]}
                   resizeMode="cover"
                 />
+                {!isOpen && (
+                  <View style={styles.closedImageOverlay}>
+                    <View style={styles.closedOverlayTag}>
+                      <Text style={styles.closedOverlayTagText}>
+                        {workingTime?.working_time_start_formatted
+                          ? t('home.opensAt', {
+                              time: workingTime.working_time_start_formatted,
+                            })
+                          : t('home.closedNotice')}
+                      </Text>
+                    </View>
+                  </View>
+                )}
                 <TouchableOpacity
                   style={styles.heartIconBtn}
                   onPress={() => handleWishlistToggle(product.id)}
@@ -133,7 +206,13 @@ function ProductsSection({
                 </TouchableOpacity>
               </View>
               <View style={styles.productInfo}>
-                <Text style={styles.productName} numberOfLines={1}>
+                <Text
+                  style={[
+                    styles.productName,
+                    !isOpen && styles.productNameDisabled,
+                  ]}
+                  numberOfLines={1}
+                >
                   {product.name_en}
                 </Text>
                 <Text style={styles.productCategory}>
@@ -152,15 +231,24 @@ function ProductsSection({
                 <View style={styles.priceRow}>
                   <View style={styles.priceWrapper}>
                     {(() => {
-                      const hasOffer = product.offer != null && product.offer.offer_price != null && product.offer.offer_price !== '';
+                      const hasOffer =
+                        product.offer != null &&
+                        product.offer.offer_price != null &&
+                        product.offer.offer_price !== '';
                       if (hasOffer) {
                         const offerPrice = product.offer!.offer_price;
                         const originalPrice = product.price;
-                        const isDiscounted = parseFloat(offerPrice) < parseFloat(originalPrice);
+                        const isDiscounted =
+                          parseFloat(offerPrice) < parseFloat(originalPrice);
                         if (isDiscounted) {
                           return (
                             <>
-                              <Text style={styles.productPrice}>
+                              <Text
+                                style={[
+                                  styles.productPrice,
+                                  !isOpen && styles.productPriceDisabled,
+                                ]}
+                              >
                                 {parseFloat(offerPrice)
                                   .toFixed(2)
                                   .replace(/\.00$/, '')}{' '}
@@ -176,10 +264,17 @@ function ProductsSection({
                           );
                         }
                       }
-                      
-                      const displayPrice = hasOffer ? product.offer!.offer_price : product.price;
+
+                      const displayPrice = hasOffer
+                        ? product.offer!.offer_price
+                        : product.price;
                       return (
-                        <Text style={styles.productPrice}>
+                        <Text
+                          style={[
+                            styles.productPrice,
+                            !isOpen && styles.productPriceDisabled,
+                          ]}
+                        >
                           {parseFloat(displayPrice)
                             .toFixed(2)
                             .replace(/\.00$/, '')}{' '}
@@ -189,12 +284,29 @@ function ProductsSection({
                     })()}
                   </View>
                   <TouchableOpacity
-                    style={styles.addButton}
+                    style={[
+                      styles.addButton,
+                      !isOpen && styles.addButtonDisabled,
+                    ]}
+                    disabled={!isOpen}
                     onPress={() => {
-                      if (onAddPress) onAddPress(product);
+                      if (!isOpen) {
+                        showClosedToast();
+                        return;
+                      }
+                      if (onAddPress) {
+                        onAddPress(product);
+                      }
                     }}
                   >
-                    <Text style={styles.addButtonText}>+</Text>
+                    <Text
+                      style={[
+                        styles.addButtonText,
+                        !isOpen && styles.addButtonTextDisabled,
+                      ]}
+                    >
+                      +
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -213,6 +325,46 @@ const createStyles = (colors: any) =>
       paddingTop: sh(20),
       paddingBottom: sh(20),
     },
+    closedBanner: {
+      backgroundColor: '#FFF4E5',
+      borderRadius: sw(16),
+      paddingHorizontal: sw(16),
+      paddingVertical: sh(14),
+      marginBottom: sh(20),
+      borderWidth: 1,
+      borderColor: '#FFE0B2',
+    },
+    closedBannerContent: {
+      flex: 1,
+    },
+    closedBadgePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: '#E65100',
+      paddingHorizontal: sw(10),
+      paddingVertical: sh(3),
+      borderRadius: sw(12),
+      marginBottom: sh(6),
+      gap: sw(6),
+    },
+    closedDot: {
+      width: sw(6),
+      height: sw(6),
+      borderRadius: sw(3),
+      backgroundColor: '#FFFFFF',
+    },
+    closedPillText: {
+      color: '#FFFFFF',
+      fontSize: fs(11),
+      fontFamily: colors.fontBold,
+    },
+    closedBannerTitle: {
+      fontSize: fs(13),
+      color: '#5D4037',
+      fontFamily: colors.fontMedium,
+      lineHeight: fs(18),
+    },
     gridContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -222,6 +374,9 @@ const createStyles = (colors: any) =>
     productCard: {
       width: '48%',
       marginBottom: sh(24),
+    },
+    productCardDisabled: {
+      opacity: 0.65,
     },
     imageWrapper: {
       width: '100%',
@@ -233,6 +388,31 @@ const createStyles = (colors: any) =>
     productImage: {
       width: '100%',
       height: '100%',
+    },
+    productImageDisabled: {
+      opacity: 0.85,
+    },
+    closedImageOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.32)',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      paddingBottom: sh(10),
+    },
+    closedOverlayTag: {
+      backgroundColor: 'rgba(0, 0, 0, 0.72)',
+      paddingHorizontal: sw(10),
+      paddingVertical: sh(4),
+      borderRadius: sw(12),
+    },
+    closedOverlayTagText: {
+      color: '#FFFFFF',
+      fontSize: fs(10),
+      fontFamily: colors.fontSemiBold,
     },
     heartIconBtn: {
       position: 'absolute',
@@ -254,6 +434,9 @@ const createStyles = (colors: any) =>
       fontSize: fs(15),
       color: colors.text,
       fontFamily: colors.fontSemiBold,
+    },
+    productNameDisabled: {
+      color: colors.textSecondary || '#888888',
     },
     productCategory: {
       fontSize: fs(12),
@@ -281,6 +464,9 @@ const createStyles = (colors: any) =>
       color: colors.success,
       fontFamily: colors.fontInterSemiBold,
     },
+    productPriceDisabled: {
+      color: colors.textSecondary || '#888888',
+    },
     originalPrice: {
       fontSize: fs(12),
       color: colors.textMuted,
@@ -306,11 +492,17 @@ const createStyles = (colors: any) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    addButtonDisabled: {
+      backgroundColor: '#CCCCCC',
+    },
     addButtonText: {
       color: colors.white,
       fontSize: fs(16),
       fontFamily: colors.fontSemiBold,
       marginTop: -sh(2),
+    },
+    addButtonTextDisabled: {
+      color: '#8E8E93',
     },
   });
 

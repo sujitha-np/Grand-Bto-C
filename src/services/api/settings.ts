@@ -1,11 +1,20 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../constants/api';
+import apiClient from './client';
 
 export interface PreorderLimitResponse {
   success: boolean;
   preorder_limit_days: number;
   max_preorder_date: string;
+}
+
+export interface WorkingTimeResponse {
+  success: boolean;
+  working_time_start: string;
+  working_time_end: string;
+  working_time_start_formatted?: string;
+  working_time_end_formatted?: string;
 }
 
 export const settingsService = {
@@ -26,6 +35,18 @@ export const settingsService = {
       return response.data;
     } catch (error: any) {
       console.error('getPreorderLimit error:', error);
+      throw error;
+    }
+  },
+
+  getWorkingTime: async (): Promise<WorkingTimeResponse> => {
+    try {
+      const { data } = await apiClient.get<WorkingTimeResponse>(
+        '/settings/working-time',
+      );
+      return data;
+    } catch (error: any) {
+      console.error('getWorkingTime error:', error);
       throw error;
     }
   },

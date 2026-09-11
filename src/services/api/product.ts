@@ -34,6 +34,8 @@ export interface Product {
   };
   is_wishlisted: boolean;
   offer_price: string;
+  status?: number;
+  product_status?: number;
   preparation_time_minutes?: number;
   preparation_time_formatted?: string;
   offer?: {
@@ -158,6 +160,34 @@ export const productService = {
         throw new Error(
           error.response.data?.message ||
             'Failed to fetch products by department',
+        );
+      }
+      throw error;
+    }
+  },
+  getProductsByCategory: async (categoryId: number) => {
+    try {
+      const { data } = await apiClient.post(
+        `/products/category/${categoryId}`,
+      );
+      console.log(
+        `Raw productsByCategory API response for ${categoryId}:`,
+        data,
+      );
+
+      if (data?.success === false || data?.error) {
+        console.log('API returned success:false or error:', data);
+        throw new Error('Failed to fetch products by category');
+      }
+
+      return data;
+    } catch (error: any) {
+      console.log('ProductsByCategory API error:', error);
+      if (error.response?.data) {
+        console.log('Error response data:', error.response.data);
+        throw new Error(
+          error.response.data?.message ||
+            'Failed to fetch products by category',
         );
       }
       throw error;

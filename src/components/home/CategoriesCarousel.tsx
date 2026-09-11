@@ -7,6 +7,7 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  TouchableOpacity,
   Animated,
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
@@ -16,13 +17,17 @@ import { Category } from '../../services/api/category';
 
 interface CategoriesCarouselProps {
   categories: Category[];
+  onCategoryPress?: (category: Category) => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const CAROUSEL_ITEM_WIDTH = SCREEN_WIDTH - sw(40); // Full width with padding
 const AUTO_SCROLL_INTERVAL = 3000; // 3 seconds
 
-function CategoriesCarousel({ categories }: CategoriesCarouselProps) {
+function CategoriesCarousel({
+  categories,
+  onCategoryPress,
+}: CategoriesCarouselProps) {
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -105,8 +110,10 @@ function CategoriesCarousel({ categories }: CategoriesCarouselProps) {
         decelerationRate="fast"
       >
         {categories.map((category, index) => (
-          <View
+          <TouchableOpacity
             key={category.id}
+            activeOpacity={0.9}
+            onPress={() => onCategoryPress?.(category)}
             style={[
               styles.carouselItem,
               index === 0 && { marginLeft: 0 },
@@ -118,7 +125,7 @@ function CategoriesCarousel({ categories }: CategoriesCarouselProps) {
               style={styles.categoryImage}
               resizeMode="cover"
             />
-          </View>
+          </TouchableOpacity>
         ))}
       </ScrollView>
 

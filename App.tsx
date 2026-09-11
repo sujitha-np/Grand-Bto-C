@@ -40,6 +40,8 @@ import NewAddressScreen from './src/screens/NewAddressScreen';
 import CheckoutScreen from './src/screens/CheckoutScreen';
 import ProductDetailScreen from './src/screens/ProductDetailScreen';
 import OfferedProductsScreen from './src/screens/OfferedProductsScreen';
+import CategoryProductsScreen from './src/screens/CategoryProductsScreen';
+import NotificationScreen from './src/screens/NotificationScreen';
 import WishlistScreen from './src/screens/WishlistScreen';
 import CouponScreen from './src/screens/CouponScreen';
 import PromoCodesScreen from './src/screens/PromoCodesScreen';
@@ -59,8 +61,20 @@ const originalFetch = (globalThis as any).fetch;
   try {
     const response = await originalFetch(input, init);
     if (response && response.status === 401) {
-      console.log('Global Fetch Interceptor - 401 Unauthorized detected!');
-      authEvents.emitUnauthorized();
+      const urlStr = typeof input === 'string' ? input : input?.url || '';
+      const isAuthEndpoint =
+        urlStr.includes('/login') ||
+        urlStr.includes('/register') ||
+        urlStr.includes('/send-otp') ||
+        urlStr.includes('/verify-otp') ||
+        urlStr.includes('/forgot-password') ||
+        urlStr.includes('/reset-password');
+
+      const token = await AsyncStorage.getItem('userToken');
+      if (token && !isAuthEndpoint) {
+        console.log('Global Fetch Interceptor - 401 Unauthorized detected on:', urlStr);
+        authEvents.emitUnauthorized();
+      }
     }
     return response;
   } catch (error) {
@@ -285,6 +299,10 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
     offerId: number;
     offerName: string;
   } | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<{
+    categoryId: number;
+    categoryName: string;
+  } | null>(null);
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const colors = useTheme();
@@ -308,6 +326,15 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
       }
       if (subScreen === 'offeredProducts') {
         setSelectedOffer(null);
+        setSubScreen(null);
+        return true;
+      }
+      if (subScreen === 'categoryProducts') {
+        setSelectedCategory(null);
+        setSubScreen(null);
+        return true;
+      }
+      if (subScreen === 'notifications') {
         setSubScreen(null);
         return true;
       }
@@ -396,6 +423,32 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
           setSelectedProduct(product);
           setSubScreen('productDetail');
         }}
+      />
+    );
+  }
+
+  if (subScreen === 'categoryProducts' && selectedCategory) {
+    return (
+      <CategoryProductsScreen
+        categoryId={selectedCategory.categoryId}
+        categoryName={selectedCategory.categoryName}
+        onBack={() => {
+          setSelectedCategory(null);
+          setSubScreen(null);
+        }}
+        onShowProductDetail={product => {
+          setSelectedProduct(product);
+          setSubScreen('productDetail');
+        }}
+      />
+    );
+  }
+
+  if (subScreen === 'notifications') {
+    return (
+      <NotificationScreen
+        customerId={customerId ? String(customerId) : undefined}
+        onBack={() => setSubScreen(null)}
       />
     );
   }
@@ -498,6 +551,7 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
         onBack={() => setSubScreen('calendar')}
         totalAmount={cartTotal}
         selectedDate={selectedDeliveryDate}
+        selectedAddress={selectedAddress}
         onAddNew={() => {
           setEditAddress(undefined);
           setSubScreen('newAddress');
@@ -590,7 +644,12 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
               setSelectedOffer({ offerId, offerName });
               setSubScreen('offeredProducts');
             }}
+            onShowCategoryProducts={(categoryId, categoryName) => {
+              setSelectedCategory({ categoryId, categoryName });
+              setSubScreen('categoryProducts');
+            }}
             onShowWishlist={() => setSubScreen('wishlist')}
+            onShowNotification={() => setSubScreen('notifications')}
           />
         )}
         {activeTab === 'orders' && (

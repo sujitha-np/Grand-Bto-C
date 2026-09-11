@@ -198,8 +198,13 @@ function RegisterScreen({ onBack, onNext }: RegisterScreenProps) {
           label={t('register.phone')}
           placeholder={t('register.phonePlaceholder')}
           value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
+          onChangeText={text => {
+            setPhone(text.replace(/[^0-9]/g, ''));
+            if (errors.phone) {
+              setErrors(prev => ({ ...prev, phone: '' }));
+            }
+          }}
+          keyboardType="number-pad"
           leftIcon={Images.call}
           containerStyle={styles.fieldWrapper}
           inputContainerStyle={styles.fieldContainer}

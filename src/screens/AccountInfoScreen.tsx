@@ -304,12 +304,13 @@ function AccountInfoScreen({ onBack }: AccountInfoScreenProps) {
 
             {/* Phone Number */}
             <InputField
+              maxLength={8}
               label={t('accountInfo.phone')}
               placeholder={t('accountInfo.phonePlaceholder')}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={text => setPhone(text.replace(/[^0-9]/g, ''))}
               editable={isEditing}
-              keyboardType="phone-pad"
+              keyboardType="number-pad"
               leftIcon={Images.call}
               containerStyle={styles.fieldWrapper}
               inputContainerStyle={styles.fieldContainer}

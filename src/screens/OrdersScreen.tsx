@@ -9,13 +9,14 @@ import {
   ActivityIndicator,
   Platform,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useOrders } from '../hooks/queries';
+import { useOrders, useCancelOrder } from '../hooks/queries';
 import { Order, OrderItem } from '../services/api/order';
 import { BASE_URL } from '../constants/api';
 import { Images } from '../assets/images';
@@ -38,6 +39,9 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
   );
   const [showCalendar, setShowCalendar] = useState(false);
   const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const { mutateAsync: cancelOrderMutation, isPending: isCancellingOrder } =
+    useCancelOrder();
 
   useEffect(() => {
     if (initialDate) {
@@ -127,6 +131,51 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
       default:
         return colors.textMuted;
     }
+  };
+
+  const canCancelOrder = (order: Order) => {
+    const status = (order.tracking_status_text || '').toLowerCase();
+    return (
+      status !== 'cancelled' &&
+      status !== 'delivered' &&
+      status !== 'completed'
+    );
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (!customerId) return;
+    setCancellingOrderId(order.id);
+    try {
+      await cancelOrderMutation({
+        order_id: order.id,
+        customer_id: customerId,
+        cancel_reason: 'Cancelled by user',
+      });
+      refetch();
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+  const promptCancelOrder = (order: Order) => {
+    Alert.alert(
+      'Cancel Order',
+      'Are you sure you want to cancel this order?',
+      [
+        {
+          text: 'No',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => handleCancelOrder(order),
+        },
+      ],
+      { cancelable: true },
+    );
   };
 
   const handleDateChange = (dateString: string) => {
@@ -288,6 +337,23 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
             {parseFloat(order.grand_total).toFixed(2)} QAR
           </Text>
         </View>
+
+        {canCancelOrder(order) && (
+          <View style={[styles.cancelButtonContainer, { borderTopColor: colors.border }]}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => promptCancelOrder(order)}
+              disabled={isCancellingOrder && cancellingOrderId === order.id}
+              activeOpacity={0.7}
+            >
+              {isCancellingOrder && cancellingOrderId === order.id ? (
+                <ActivityIndicator size="small" color="#FF3B30" />
+              ) : (
+                <Text style={styles.cancelButtonText}>Cancel Order</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -580,6 +646,26 @@ const styles = StyleSheet.create({
   dateLabel: {
     fontSize: fs(14),
     fontWeight: '500',
+  },
+  cancelButtonContainer: {
+    paddingHorizontal: sw(16),
+    paddingTop: sh(10),
+    paddingBottom: sh(14),
+    borderTopWidth: 1,
+  },
+  cancelButton: {
+    backgroundColor: '#FFF1F0',
+    borderWidth: 1,
+    borderColor: '#FFA39E',
+    borderRadius: sw(10),
+    paddingVertical: sh(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButtonText: {
+    fontSize: fs(14),
+    color: '#FF4D4F',
+    fontWeight: '600',
   },
 });
 

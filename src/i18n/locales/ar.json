@@ -93,7 +93,11 @@
     "orderNow": "اطلب الآن",
     "homeTab": "الرئيسية",
     "ordersTab": "الطلبات",
-    "accountTab": "الحساب"
+    "accountTab": "الحساب",
+    "storeClosed": "مغلق حالياً",
+    "storeClosedDesc": "لا نستقبل طلبات حالياً. أوقات العمل: {{start}} - {{end}}.",
+    "opensAt": "يفتح في {{time}}",
+    "closedNotice": "مغلق حالياً"
   },
   "account": {
     "accountInfo": "معلومات الحساب",
@@ -170,7 +174,8 @@
     "additionalDirectionsPlaceholder": "اتجاهات إضافية",
     "save": "حفظ",
     "submit": "إرسال",
-    "required": "هذا الحقل مطلوب"
+    "required": "هذا الحقل مطلوب",
+    "invalidPhone": "يرجى إدخال رقم هاتف صالح"
   },
   "savedAddress": {
     "title": "العناوين المحفوظة",

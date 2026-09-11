@@ -154,8 +154,8 @@ function LoginScreen({ onBack, onLogin, onForgotPassword }: LoginScreenProps) {
           label={t('login.phone')}
           placeholder={t('login.phonePlaceholder')}
           value={phone}
-          onChangeText={setPhone}
-          keyboardType="phone-pad"
+          onChangeText={text => setPhone(text.replace(/[^0-9]/g, ''))}
+          keyboardType="number-pad"
           leftIcon={Images.call}
           containerStyle={styles.fieldWrapper}
           inputContainerStyle={styles.fieldContainer}

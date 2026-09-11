@@ -57,7 +57,13 @@ function NewAddressScreen({
         name: yup.string().required(t('newAddress.required')),
         buildingName: yup.string().required(t('newAddress.required')),
         street: yup.string().required(t('newAddress.required')),
-        phoneNumber: yup.string().required(t('newAddress.required')),
+        phoneNumber: yup
+          .string()
+          .required(t('newAddress.required'))
+          .matches(
+            /^[0-9]+$/,
+            t('newAddress.invalidPhone', 'Please enter a valid phone number'),
+          ),
         additionalDirections: yup.string().required(t('newAddress.required')),
         aptNumber: yup.string().notRequired(),
         floor: yup.string().notRequired(),
@@ -538,12 +544,13 @@ function NewAddressScreen({
             placeholderTextColor={colors.placeholderGray}
             value={phoneNumber}
             onChangeText={text => {
-              setPhoneNumber(text);
+              const numericText = text.replace(/[^0-9]/g, '');
+              setPhoneNumber(numericText);
               if (errors.phoneNumber) {
                 setErrors(prev => ({ ...prev, phoneNumber: '' }));
               }
             }}
-            keyboardType="phone-pad"
+            keyboardType="number-pad"
             maxLength={8}
           />
           {errors.phoneNumber ? (

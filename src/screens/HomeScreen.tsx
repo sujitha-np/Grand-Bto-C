@@ -18,6 +18,7 @@ import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { Images } from '../assets/images';
 import { Department } from '../services/api/department';
+import { Category } from '../services/api/category';
 import { Product } from '../services/api/product';
 import {
   useDepartments,
@@ -28,9 +29,14 @@ import {
   useSearchProducts,
   useCategories,
   useOffers,
+  useWorkingTime,
+  useNotifications,
 } from '../hooks/queries';
+import { isStoreOpen } from '../utils/workingTime';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
+import { useQueryClient } from '@tanstack/react-query';
+import { getReadNotificationIds, markNotificationsAsRead } from '../utils/notifications';
 import PromoBannersSection from '../components/home/PromoBannersSection';
 import CategoriesSection from '../components/home/CategoriesSection';
 import ProductsSection from '../components/home/ProductsSection';
@@ -41,7 +47,9 @@ interface HomeScreenProps {
   onShowCart?: () => void;
   onShowProductDetail?: (product: Product) => void;
   onShowOfferedProducts?: (offerId: number, offerName: string) => void;
+  onShowCategoryProducts?: (categoryId: number, categoryName: string) => void;
   onShowWishlist?: () => void;
+  onShowNotification?: () => void;
 }
 
 function HomeScreen({
@@ -49,11 +57,14 @@ function HomeScreen({
   onShowCart,
   onShowProductDetail,
   onShowOfferedProducts,
+  onShowCategoryProducts,
   onShowWishlist,
+  onShowNotification,
 }: HomeScreenProps) {
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
   const colors = useTheme();
+  const queryClient = useQueryClient();
   const [searchText, setSearchText] = useState('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<
     number | undefined
@@ -61,6 +72,8 @@ function HomeScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [readNotificationIds, setReadNotificationIds] = useState<number[]>([]);
   const { mutateAsync: addToCart } = useAddToCart();
 
   const scrollViewRef = React.useRef<ScrollView>(null);
@@ -89,7 +102,29 @@ function HomeScreen({
     loadCustomerId();
   }, []);
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
+  const {
+    data: workingTimeData,
+    refetch: refetchWorkingTime,
+  } = useWorkingTime();
+  const workingTime = workingTimeData?.success ? workingTimeData : null;
+
+  const isOpen = React.useMemo(() => {
+    if (!workingTime?.working_time_start || !workingTime?.working_time_end) {
+      return true;
+    }
+    return isStoreOpen(
+      workingTime.working_time_start,
+      workingTime.working_time_end,
+      currentTime,
+    );
+  }, [workingTime, currentTime]);
 
   const {
     data: departmentsData,
@@ -107,10 +142,29 @@ function HomeScreen({
     useProductsByDepartment(selectedDepartmentId);
   const { data: searchProductsData, refetch: refetchSearchProducts } =
     useSearchProducts(searchText);
+  const {
+    data: notificationsData,
+    refetch: refetchNotifications,
+  } = useNotifications(customerId);
 
   const departments = departmentsData?.data || [];
   const categories = categoriesData?.data || [];
   const offers = offersData?.data || [];
+  const allNotifications = notificationsData?.data?.notifications || [];
+
+  useEffect(() => {
+    const loadReadIds = async () => {
+      const ids = await getReadNotificationIds();
+      setReadNotificationIds(ids);
+    };
+    loadReadIds();
+  }, [notificationsData]);
+
+  const unreadNotificationCount = allNotifications.length > 0
+    ? allNotifications.filter(
+        n => !n.is_read && !readNotificationIds.includes(n.id),
+      ).length
+    : (notificationsData?.data?.unread_count || 0);
 
   // Determine which products to show based on search state
   const products =
@@ -132,6 +186,13 @@ function HomeScreen({
     }
   };
 
+  const handleCategoryBannerPress = (category: Category) => {
+    console.log('Category banner pressed:', category);
+    if (onShowCategoryProducts && category.id) {
+      onShowCategoryProducts(category.id, category.name_en);
+    }
+  };
+
   const handleCategoryPress = (index: number) => {
     const dept = departments[index];
     if (dept) {
@@ -144,6 +205,32 @@ function HomeScreen({
     }
   };
 
+  const handleNotificationPress = async () => {
+    if (allNotifications.length > 0) {
+      const ids = allNotifications.map(n => n.id);
+      const updated = await markNotificationsAsRead(ids);
+      setReadNotificationIds(updated);
+
+      if (customerId) {
+        queryClient.setQueryData(['notifications', customerId], (prev: any) => {
+          if (!prev?.data) return prev;
+          return {
+            ...prev,
+            data: {
+              ...prev.data,
+              unread_count: 0,
+              notifications: prev.data.notifications.map((n: any) => ({
+                ...n,
+                is_read: true,
+              })),
+            },
+          };
+        });
+      }
+    }
+    onShowNotification?.();
+  };
+
   const handleProductPress = (product: Product) => {
     console.log('Product pressed:', product);
     if (onShowProductDetail) {
@@ -153,11 +240,14 @@ function HomeScreen({
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setCurrentTime(new Date());
     await Promise.all([
+      refetchWorkingTime(),
       refetchDepartments(),
       refetchCategories(),
       refetchOffers(),
       refetchProducts(),
+      refetchNotifications(),
       selectedDepartmentId ? refetchDeptProducts() : Promise.resolve(),
       searchText.trim().length >= 2 ? refetchSearchProducts() : Promise.resolve(),
     ]);
@@ -227,6 +317,17 @@ function HomeScreen({
               <TouchableOpacity
                 style={styles.iconBtn}
                 activeOpacity={0.7}
+                onPress={handleNotificationPress}
+              >
+                <Image
+                  source={Images.notification}
+                  style={styles.headerIcon}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.iconBtn}
+                activeOpacity={0.7}
                 onPress={onShowCart}
               >
                 <Image
@@ -288,7 +389,10 @@ function HomeScreen({
         {/* Categories Carousel */}
         <View style={styles.categoriesSection}>
           <Text style={styles.sectionTitle}>{t('home.preBook')}</Text>
-          <CategoriesCarousel categories={categories} />
+          <CategoriesCarousel
+            categories={categories}
+            onCategoryPress={handleCategoryBannerPress}
+          />
         </View>
 
         {/* Promo Banners */}
@@ -310,8 +414,27 @@ function HomeScreen({
         >
           <ProductsSection
             products={products}
+            isOpen={isOpen}
+            workingTime={workingTime}
             onProductPress={handleProductPress}
             onAddPress={async product => {
+              if (!isOpen) {
+                Toast.show({
+                  type: 'info',
+                  text1: t('home.storeClosed'),
+                  text2: t('home.storeClosedDesc', {
+                    start:
+                      workingTime?.working_time_start_formatted ||
+                      workingTime?.working_time_start ||
+                      '07:00 AM',
+                    end:
+                      workingTime?.working_time_end_formatted ||
+                      workingTime?.working_time_end ||
+                      '10:00 PM',
+                  }),
+                });
+                return;
+              }
               const customerId = await AsyncStorage.getItem('customerId');
               const token = await AsyncStorage.getItem('userToken');
               console.log('Customer ID:', customerId);
@@ -461,6 +584,28 @@ const createStyles = (colors: any, insets: any) =>
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: colors.card,
+      position: 'relative',
+    },
+    notificationBadge: {
+      position: 'absolute',
+      top: -sw(2),
+      right: -sw(2),
+      backgroundColor: '#FF3B30',
+      minWidth: sw(18),
+      height: sw(18),
+      borderRadius: sw(9),
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: sw(4),
+      borderWidth: 1.5,
+      borderColor: '#FFFFFF',
+    },
+    notificationBadgeText: {
+      color: '#FFFFFF',
+      fontSize: fs(9),
+      fontFamily: colors.fontBold,
+      lineHeight: fs(11),
+      textAlign: 'center',
     },
     headerIcon: {
       width: sw(20),

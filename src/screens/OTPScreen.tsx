@@ -134,7 +134,10 @@ function OTPScreen({ onBack, onContinue, customerId }: OTPScreenProps) {
         resp?.token ||
         resp?.data?.token ||
         resp?.access_token ||
-        resp?.data?.access_token;
+        resp?.data?.access_token ||
+        resp?.data?.customer?.token ||
+        resp?.customer?.token ||
+        resp?.data?.data?.token;
       console.log('Token found:', token ? 'YES' : 'NO');
       if (token) {
         await AsyncStorage.setItem('userToken', token);

@@ -18,11 +18,15 @@ apiClient.interceptors.request.use(async config => {
     console.log('Interceptor - Request URL:', config.url);
     if (token) {
       if (config.headers && typeof config.headers.set === 'function') {
-        config.headers.set('Authorization', `Bearer ${token}`);
+        config.headers.set('Authorization', `bearer ${token}`);
+        config.headers.set('bearer', `${token}`);
+        config.headers.set('token', `${token}`);
       } else if (config.headers) {
-        config.headers['Authorization'] = `Bearer ${token}`;
+        config.headers['Authorization'] = `bearer ${token}`;
+        config.headers['bearer'] = `${token}`;
+        config.headers['token'] = `${token}`;
       }
-      console.log('Interceptor - Authorization header set');
+      console.log('Interceptor - Authorization headers set');
     }
   } catch (error) {
     console.log('Interceptor - Error getting token:', error);
@@ -33,10 +37,25 @@ apiClient.interceptors.request.use(async config => {
 
 apiClient.interceptors.response.use(
   response => response,
-  error => {
+  async error => {
     if (error.response && error.response.status === 401) {
-      console.log('Axios Interceptor - 401 Unauthorized detected!');
-      authEvents.emitUnauthorized();
+      const url = error.config?.url || '';
+      const isAuthEndpoint =
+        url.includes('/login') ||
+        url.includes('/register') ||
+        url.includes('/send-otp') ||
+        url.includes('/verify-otp') ||
+        url.includes('/forgot-password') ||
+        url.includes('/reset-password');
+
+      const token = await AsyncStorage.getItem('userToken');
+      if (token && !isAuthEndpoint) {
+        console.log(
+          'Axios Interceptor - 401 Unauthorized detected on protected route:',
+          url,
+        );
+        authEvents.emitUnauthorized();
+      }
     }
     return Promise.reject(error);
   }

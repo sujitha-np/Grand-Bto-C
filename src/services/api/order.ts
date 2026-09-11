@@ -105,7 +105,6 @@ export const orderService = {
     customerId: string,
   ): Promise<OrderHistoryResponse> => {
     const token = await AsyncStorage.getItem('userToken');
-    
 
     const formData = new FormData();
     formData.append('customer_id', customerId);
@@ -129,4 +128,64 @@ export const orderService = {
 
     return data;
   },
+
+  cancelOrder: async (cancelData: {
+    order_id: string | number;
+    customer_id: string | number;
+    cancel_reason?: string;
+    refund_type?: string;
+  }): Promise<{ success: boolean; message: string; data?: any }> => {
+    const token = await AsyncStorage.getItem('userToken');
+    const url = `${BASE_URL}/api/customer/cancel-order`;
+
+    console.log('==============================================');
+    console.log('🚫 [Cancel Order API] Initiating Request:');
+    console.log('URL:', url);
+    console.log('Payload:', cancelData);
+    console.log('Token:', token ? `${token.substring(0, 20)}...` : 'NOT FOUND');
+
+    const formData = new FormData();
+    formData.append('order_id', String(cancelData.order_id));
+    formData.append('customer_id', String(cancelData.customer_id));
+    formData.append(
+      'cancel_reason',
+      cancelData.cancel_reason || 'Cancelled by user',
+    );
+    if (cancelData.refund_type && cancelData.refund_type.trim() !== '') {
+      formData.append('refund_type', String(cancelData.refund_type));
+    }
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        Authorization: `bearer ${token}`,
+        bearer: `${token}`,
+        token: `${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await response.json();
+    console.log('🚫 [Cancel Order API] Response Status:', response.status);
+    console.log(
+      '🚫 [Cancel Order API] Response Data:',
+      JSON.stringify(data, null, 2),
+    );
+    console.log('==============================================');
+
+    if (!response.ok || data?.success === false) {
+      let errorMsg = data?.reason || data?.message || 'Failed to cancel order';
+      if (data?.errors) {
+        const firstErrorKey = Object.keys(data.errors)[0];
+        if (firstErrorKey && Array.isArray(data.errors[firstErrorKey])) {
+          errorMsg = data.errors[firstErrorKey][0];
+        }
+      }
+      throw new Error(errorMsg);
+    }
+
+    return data;
+  },
 };
+

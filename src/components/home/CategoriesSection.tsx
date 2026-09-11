@@ -35,7 +35,7 @@ function CategoriesSection({
   onCategoryPress,
   selectedDepartmentId,
 }: CategoriesSectionProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const styles = React.useMemo(() => createStyles(colors), [colors]);
@@ -54,6 +54,14 @@ function CategoriesSection({
   const handlePress = (index: number) => {
     scrollToItem(index);
     onCategoryPress?.(index);
+  };
+
+  const getDepartmentName = (dept: Department) => {
+    if (dept.display_name && dept.display_name.trim() !== '') {
+      return dept.display_name;
+    }
+    const isArabic = i18n.language?.startsWith('ar');
+    return isArabic ? (dept.name_ar || dept.name_en) : (dept.name_en || dept.name_ar);
   };
 
   return (
@@ -99,7 +107,7 @@ function CategoriesSection({
                     isSelected && styles.categoryLabelSelected,
                   ]}
                 >
-                  {dept.name_en}
+                  {getDepartmentName(dept)}
                 </Text>
               </TouchableOpacity>
             );

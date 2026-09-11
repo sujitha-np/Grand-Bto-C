@@ -45,6 +45,7 @@ interface SavedAddressScreenProps {
   onBack: () => void;
   totalAmount: number;
   selectedDate?: string;
+  selectedAddress?: SavedAddress;
   onAddNew?: () => void;
   onEditAddress?: (address: SavedAddress) => void;
   onProceedToCheckout?: (address: SavedAddress) => void;
@@ -77,6 +78,7 @@ function SavedAddressScreen({
   onBack,
   totalAmount,
   selectedDate,
+  selectedAddress: propSelectedAddress,
   onAddNew,
   onEditAddress,
   onProceedToCheckout,
@@ -86,7 +88,7 @@ function SavedAddressScreen({
   const insets = useSafeAreaInsets();
   const [customerId, setCustomerId] = useState<string>();
   const [selectedAddress, setSelectedAddress] = useState<SavedAddress | null>(
-    null,
+    propSelectedAddress ?? null,
   );
   const [hasError, setHasError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -122,8 +124,30 @@ function SavedAddressScreen({
 
   const addresses = addressResponse?.data ?? [];
 
+  useEffect(() => {
+    if (addresses.length > 0) {
+      setSelectedAddress(prev => {
+        // If an address is already selected and still exists in addresses list, keep it
+        if (prev) {
+          const currentMatch = addresses.find(addr => addr.id === prev.id);
+          if (currentMatch) {
+            return currentMatch;
+          }
+        }
+        // Otherwise, select the default address (is_default === 1), or fallback to the first address
+        const defaultAddress = addresses.find(
+          addr => Number(addr.is_default) === 1,
+        );
+        return defaultAddress || addresses[0];
+      });
+    } else {
+      setSelectedAddress(null);
+    }
+  }, [addresses]);
+
   const handleSetDefault = (address: SavedAddress) => {
     if (!customerId) return;
+    setSelectedAddress(address);
     setDefaultMutation.mutate({
       addressId: address.id.toString(),
       customerId: customerId,
@@ -243,7 +267,7 @@ function SavedAddressScreen({
             ? addresses.map(address => {
                 const phoneNumber = address.phone_no || address.phone || '-';
                 const isSelected = selectedAddress?.id === address.id;
-                const isDefault = address.is_default === 1;
+                const isDefault = Number(address.is_default) === 1;
                 return (
                   <TouchableOpacity
                     key={address.id}

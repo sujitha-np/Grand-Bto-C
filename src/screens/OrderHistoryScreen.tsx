@@ -9,13 +9,14 @@ import {
   ActivityIndicator,
   StatusBar,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useOrderHistory, useOrders } from '../hooks/queries';
+import { useOrderHistory, useOrders, useCancelOrder } from '../hooks/queries';
 import { Order } from '../services/api/order';
 import { BASE_URL } from '../constants/api';
 import { Images } from '../assets/images';
@@ -38,6 +39,9 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
   const [selectedDate, setSelectedDate] = useState<string | undefined>(
     undefined,
   );
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const { mutateAsync: cancelOrderMutation, isPending: isCancellingOrder } =
+    useCancelOrder();
 
   const styles = React.useMemo(
     () => createStyles(colors, insets),
@@ -249,6 +253,51 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
     );
   };
 
+  const canCancelOrder = (order: Order) => {
+    const status = (order.tracking_status_text || '').toLowerCase();
+    return (
+      status !== 'cancelled' &&
+      status !== 'delivered' &&
+      status !== 'completed'
+    );
+  };
+
+  const handleCancelOrder = async (order: Order) => {
+    if (!customerId) return;
+    setCancellingOrderId(order.id);
+    try {
+      await cancelOrderMutation({
+        order_id: order.id,
+        customer_id: customerId,
+        cancel_reason: 'Cancelled by user',
+      });
+      refetch();
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+    } finally {
+      setCancellingOrderId(null);
+    }
+  };
+
+  const promptCancelOrder = (order: Order) => {
+    Alert.alert(
+      'Cancel Order',
+      'Are you sure you want to cancel this order?',
+      [
+        {
+          text: 'No',
+          style: 'cancel',
+        },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: () => handleCancelOrder(order),
+        },
+      ],
+      { cancelable: true },
+    );
+  };
+
   const renderOrder = (order: Order) => {
     const total = parseFloat(order.grand_total);
 
@@ -264,6 +313,23 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
             {total.toFixed(2)} {t('orderHistory.currency')}
           </Text>
         </View>
+
+        {canCancelOrder(order) && (
+          <View style={styles.cancelButtonContainer}>
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={() => promptCancelOrder(order)}
+              disabled={isCancellingOrder && cancellingOrderId === order.id}
+              activeOpacity={0.7}
+            >
+              {isCancellingOrder && cancellingOrderId === order.id ? (
+                <ActivityIndicator size="small" color="#FF3B30" />
+              ) : (
+                <Text style={styles.cancelButtonText}>Cancel Order</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
     );
   };
@@ -533,6 +599,26 @@ const createStyles = (colors: any, insets: any) =>
       fontSize: fs(16),
       fontFamily: colors.fontBold,
       color: colors.text,
+    },
+    cancelButtonContainer: {
+      paddingTop: sh(10),
+      marginTop: sh(10),
+      borderTopWidth: 1,
+      borderTopColor: colors.borderSubtle,
+    },
+    cancelButton: {
+      backgroundColor: '#FFF1F0',
+      borderWidth: 1,
+      borderColor: '#FFA39E',
+      borderRadius: sw(10),
+      paddingVertical: sh(10),
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelButtonText: {
+      fontSize: fs(14),
+      color: '#FF4D4F',
+      fontFamily: colors.fontSemiBold,
     },
     emptyState: {
       paddingVertical: sh(60),

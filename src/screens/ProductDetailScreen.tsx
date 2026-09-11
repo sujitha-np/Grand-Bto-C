@@ -194,15 +194,6 @@ function ProductDetailScreen({
                   resizeMode="contain"
                 />
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.shareButton, { backgroundColor: colors.card }]}
-              >
-                <Image
-                  source={Images.share}
-                  style={styles.shareIcon}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -517,23 +508,7 @@ const createStyles = (colors: any, insets: any) =>
       width: sw(20),
       height: sw(20),
     },
-    shareButton: {
-      width: sw(40),
-      height: sw(40),
-      borderRadius: sw(20),
-      justifyContent: 'center',
-      alignItems: 'center',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-      backgroundColor: colors.card,
-    },
-    shareIcon: {
-      width: sw(20),
-      height: sw(20),
-    },
+
     rightActions: {
       flexDirection: 'row',
       gap: sw(10),

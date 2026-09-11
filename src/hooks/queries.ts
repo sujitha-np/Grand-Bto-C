@@ -17,13 +17,46 @@ import { promocodeService } from '../services/api/promocode';
 import { feedbackService } from '../services/api/feedback';
 import { addonsService } from '../services/api/addons';
 import { settingsService } from '../services/api/settings';
+import { notificationService } from '../services/api/notification';
 import Toast from 'react-native-toast-message';
+
+export const useNotifications = (customerId?: string | number) => {
+  return useQuery({
+    queryKey: ['notifications', customerId],
+    queryFn: async () => {
+      if (!customerId) {
+        return {
+          success: false,
+          data: {
+            customer_id: '',
+            total_notifications: 0,
+            unread_count: 0,
+            notifications: [],
+          },
+        };
+      }
+      return notificationService.getNotifications(customerId);
+    },
+    enabled: !!customerId,
+    staleTime: 0,
+    refetchInterval: 30 * 1000,
+  });
+};
 
 export const useDepartments = () => {
   return useQuery({
     queryKey: ['departments'],
     queryFn: () => departmentService.getDepartments(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useWorkingTime = () => {
+  return useQuery({
+    queryKey: ['working-time'],
+    queryFn: () => settingsService.getWorkingTime(),
+    staleTime: 60 * 1000, // 1 minute
+    refetchInterval: 60 * 1000, // auto refetch every 1 minute
   });
 };
 
@@ -121,6 +154,21 @@ export const useProductsByDepartment = (departmentId?: number) => {
       return data;
     },
     enabled: !!departmentId,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+};
+
+export const useCategoryProducts = (categoryId?: number) => {
+  return useQuery({
+    queryKey: ['products', 'category', categoryId],
+    queryFn: async () => {
+      if (!categoryId) return { success: false, data: [] };
+      console.log(`Fetching products for category ${categoryId}...`);
+      const data = await productService.getProductsByCategory(categoryId);
+      console.log(`Products fetched for category ${categoryId}:`, data);
+      return data;
+    },
+    enabled: !!categoryId,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
@@ -868,4 +916,35 @@ export const useCheckoutDetails = (
     staleTime: 0,
   });
 };
+
+export const useCancelOrder = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (cancelData: {
+      order_id: string | number;
+      customer_id: string | number;
+      cancel_reason?: string;
+      refund_type?: string;
+    }) => {
+      return orderService.cancelOrder(cancelData);
+    },
+    onSuccess: data => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['order-history'] });
+      Toast.show({
+        type: 'success',
+        text1: 'Order Cancelled',
+        text2: data?.message || 'Your order has been cancelled successfully',
+      });
+    },
+    onError: (error: any) => {
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to cancel order',
+        text2: error?.message || 'An error occurred while cancelling order',
+      });
+    },
+  });
+};
+
 

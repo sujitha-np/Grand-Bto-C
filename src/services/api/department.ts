@@ -5,6 +5,7 @@ export interface Department {
   id: number;
   name_en: string;
   name_ar: string;
+  display_name?: string | null;
   url_slug: string;
   image: string;
   status: number;

@@ -93,7 +93,11 @@
     "orderNow": "Order Now",
     "homeTab": "Home",
     "ordersTab": "Orders",
-    "accountTab": "Account"
+    "accountTab": "Account",
+    "storeClosed": "Currently Closed",
+    "storeClosedDesc": "We're currently not accepting orders. Opening hours: {{start}} - {{end}}.",
+    "opensAt": "Opens at {{time}}",
+    "closedNotice": "Currently Closed"
   },
   "account": {
     "accountInfo": "Account Info",
@@ -170,7 +174,8 @@
     "additionalDirectionsPlaceholder": "Additional Directions",
     "save": "Save",
     "submit": "Submit",
-    "required": "This field is required"
+    "required": "This field is required",
+    "invalidPhone": "Please enter a valid phone number"
   },
   "savedAddress": {
     "title": "Saved Address",
