@@ -10,25 +10,36 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import { BASE_URL } from '../constants/api';
 import { ProductDetail } from '../services/api/product';
 import { Images } from '../assets/images';
-import { useAddons, useWishlist, useAddToWishlist, useRemoveFromWishlist } from '../hooks/queries';
+import {
+  useAddons,
+  useWishlist,
+  useAddToWishlist,
+  useRemoveFromWishlist,
+  useCart,
+} from '../hooks/queries';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProductDetailScreenProps {
   product: ProductDetail;
   onBack: () => void;
   onAddToCart: (productId: number, quantity: number) => void;
+  onShowCart?: () => void;
 }
 
 function ProductDetailScreen({
   product,
   onBack,
   onAddToCart,
+  onShowCart,
 }: ProductDetailScreenProps) {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [quantity, setQuantity] = useState(1);
@@ -38,9 +49,30 @@ function ProductDetailScreen({
 
   const scrollViewRef = useRef<ScrollView>(null);
   const [customerId, setCustomerId] = useState<string | undefined>();
+  const today = new Date().toISOString().split('T')[0];
   const { data: wishlistData } = useWishlist(customerId);
   const { mutateAsync: addToWishlist } = useAddToWishlist();
   const { mutateAsync: removeFromWishlist } = useRemoveFromWishlist();
+  const { data: cartResponse } = useCart(customerId, today);
+
+  const cartItems: any[] = React.useMemo(() => {
+    const cartData = (cartResponse?.data as any)?.cart;
+    if (cartData?.items && Array.isArray(cartData.items)) {
+      return cartData.items;
+    }
+    if (Array.isArray(cartResponse?.data)) {
+      return cartResponse.data;
+    }
+    return [];
+  }, [cartResponse]);
+
+  const cartProductIds = React.useMemo(
+    () => new Set(cartItems.map((item: any) => String(item.product_id))),
+    [cartItems],
+  );
+
+  const isInCart = (productId: number | string) =>
+    cartProductIds.has(String(productId));
 
   useEffect(() => {
     const getCustomerId = async () => {
@@ -206,42 +238,57 @@ function ProductDetailScreen({
               { color: colors.textMuted, fontFamily: colors.fontRegular },
             ]}
           >
-          {product.department?.name_en || product.department_info?.name_en}
-        </Text>
+            {isArabic
+              ? product.department?.name_ar ||
+                product.department_info?.name_ar ||
+                product.department?.name_en ||
+                product.department_info?.name_en
+              : product.department?.name_en ||
+                product.department_info?.name_en ||
+                product.department?.name_ar ||
+                product.department_info?.name_ar}
+          </Text>
 
-        {/* Product Name */}
-        <Text
-          style={[
-            styles.productName,
-            { color: colors.text, fontFamily: colors.fontBold },
-          ]}
-        >
-          {product.name_en}
-        </Text>
-
-        {/* Description */}
-        {product.description_en ? (
+          {/* Product Name */}
           <Text
             style={[
-              styles.description,
-              { color: colors.textMuted, fontFamily: colors.fontRegular },
+              styles.productName,
+              { color: colors.text, fontFamily: colors.fontBold },
             ]}
           >
-            {product.description_en}
+            {isArabic
+              ? product.name_ar || product.name_en
+              : product.name_en || product.name_ar}
           </Text>
-        ) : (
-          <Text
-            style={[
-              styles.description,
-              { color: colors.textMuted, fontFamily: colors.fontRegular },
-            ]}
-          >
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
-            eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
-            ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
-            aliquip ex ea commodo consequat.
-          </Text>
-        )}
+
+          {/* Description */}
+          {(() => {
+            const desc = isArabic
+              ? product.description_ar || product.description_en || product.description
+              : product.description_en || product.description_ar || product.description;
+            return desc ? (
+              <Text
+                style={[
+                  styles.description,
+                  { color: colors.textMuted, fontFamily: colors.fontRegular },
+                ]}
+              >
+                {desc}
+              </Text>
+            ) : (
+              <Text
+                style={[
+                  styles.description,
+                  { color: colors.textMuted, fontFamily: colors.fontRegular },
+                ]}
+              >
+                Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do
+                eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim
+                ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+                aliquip ex ea commodo consequat.
+              </Text>
+            );
+          })()}
 
         {/* Preparation Time */}
         {product.preparation_time_formatted && (
@@ -342,7 +389,9 @@ function ProductDetailScreen({
                       { color: colors.text, fontFamily: colors.fontMedium },
                     ]}
                   >
-                    {addon.name_en}
+                    {isArabic
+                      ? addon.name_ar || addon.name_en
+                      : addon.name_en || addon.name_ar}
                   </Text>
                   <Text
                     style={[
@@ -455,14 +504,44 @@ function ProductDetailScreen({
             </TouchableOpacity>
           </View>
 
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
-            onPress={handleAddToCart}
-          >
-            <Text style={styles.addButtonText}>
-              Add item • {calculateTotalPrice().toFixed(2)} QAR
-            </Text>
-          </TouchableOpacity>
+          {(() => {
+            const isInactive =
+              product.status === 0 || product.product_status === 0;
+            const inCart = isInCart(product.id);
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.addButton,
+                  {
+                    backgroundColor: isInactive
+                      ? '#CCCCCC'
+                      : colors.primary,
+                  },
+                ]}
+                disabled={isInactive}
+                onPress={() => {
+                  if (inCart) {
+                    onShowCart?.();
+                  } else {
+                    handleAddToCart();
+                  }
+                }}
+              >
+                <Text
+                  style={[
+                    styles.addButtonText,
+                    isInactive && { color: '#8E8E93' },
+                  ]}
+                >
+                  {isInactive
+                    ? t('common.unavailable')
+                    : inCart
+                    ? t('home.viewInCart')
+                    : `${isArabic ? 'إضافة' : 'Add item'} • ${calculateTotalPrice().toFixed(2)} QAR`}
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
         </View>
       </View>
     </View>

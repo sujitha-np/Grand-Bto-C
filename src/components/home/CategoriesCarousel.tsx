@@ -8,12 +8,13 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
   TouchableOpacity,
-  Animated,
+  ActivityIndicator,
 } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
 import { sw, sh } from '../../utils/responsive';
 import { BASE_URL } from '../../constants/api';
 import { Category } from '../../services/api/category';
+import { prefetchCategoriesImages } from '../../utils/imagePrefetch';
 
 interface CategoriesCarouselProps {
   categories: Category[];
@@ -34,6 +35,13 @@ function CategoriesCarousel({
   const scrollViewRef = useRef<ScrollView>(null);
   const autoScrollTimer = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Prefetch all banner images whenever categories change
+  useEffect(() => {
+    if (categories && categories.length > 0) {
+      prefetchCategoriesImages(categories);
+    }
+  }, [categories]);
+
   const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / (CAROUSEL_ITEM_WIDTH + sw(12)));
@@ -48,12 +56,10 @@ function CategoriesCarousel({
   };
 
   const resetAutoScroll = () => {
-    // Clear existing timer
     if (autoScrollTimer.current) {
       clearInterval(autoScrollTimer.current);
     }
 
-    // Restart auto-scroll after user interaction
     if (categories.length > 1) {
       autoScrollTimer.current = setInterval(() => {
         setActiveIndex(prevIndex => {
@@ -69,13 +75,12 @@ function CategoriesCarousel({
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / (CAROUSEL_ITEM_WIDTH + sw(12)));
     setActiveIndex(index);
-    resetAutoScroll(); // Restart auto-scroll after manual scroll
+    resetAutoScroll();
   };
 
   useEffect(() => {
     if (categories.length <= 1) return;
 
-    // Start auto-scroll
     autoScrollTimer.current = setInterval(() => {
       setActiveIndex(prevIndex => {
         const nextIndex = (prevIndex + 1) % categories.length;
@@ -84,7 +89,6 @@ function CategoriesCarousel({
       });
     }, AUTO_SCROLL_INTERVAL);
 
-    // Cleanup timer on unmount
     return () => {
       if (autoScrollTimer.current) {
         clearInterval(autoScrollTimer.current);
@@ -93,7 +97,13 @@ function CategoriesCarousel({
   }, [categories.length]);
 
   if (!categories || categories.length === 0) {
-    return null;
+    return (
+      <View style={styles.skeletonContainer}>
+        <View style={[styles.carouselItem, styles.skeletonItem, { backgroundColor: colors.card }]}>
+          <ActivityIndicator size="small" color={colors.primary} />
+        </View>
+      </View>
+    );
   }
 
   return (
@@ -121,9 +131,13 @@ function CategoriesCarousel({
             ]}
           >
             <Image
-              source={{ uri: `${BASE_URL}${category.image}` }}
+              source={{
+                uri: `${BASE_URL}${category.image}`,
+                cache: 'force-cache',
+              }}
               style={styles.categoryImage}
               resizeMode="cover"
+              fadeDuration={0}
             />
           </TouchableOpacity>
         ))}
@@ -156,11 +170,20 @@ const createStyles = (colors: any) =>
       borderRadius: sw(20),
       overflow: 'hidden',
       marginRight: sw(12),
+      backgroundColor: colors.card || '#F5F5F5',
     },
     categoryImage: {
       width: '100%',
       height: '100%',
       borderRadius: sw(20),
+      backgroundColor: colors.card || '#F5F5F5',
+    },
+    skeletonContainer: {
+      paddingHorizontal: 0,
+    },
+    skeletonItem: {
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     pagination: {
       flexDirection: 'row',

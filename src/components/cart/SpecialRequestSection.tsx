@@ -6,44 +6,201 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
+  Alert,
+  Modal,
 } from 'react-native';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { useTranslation } from 'react-i18next';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Images } from '../../assets/images';
+import { BASE_URL } from '../../constants/api';
+
+export interface SpecialRequestImageFile {
+  uri: string;
+  name?: string;
+  type?: string;
+}
 
 interface SpecialRequestSectionProps {
   colors: any;
   specialRequest?: string;
+  specialRequestImage?: string | null;
   onAddPress?: () => void;
-  onSave?: (text: string) => void;
+  onSave?: (
+    text: string,
+    imageFile?: SpecialRequestImageFile | null,
+  ) => void;
 }
 
 export default function SpecialRequestSection({
   colors,
   specialRequest = '',
+  specialRequestImage = null,
   onAddPress,
   onSave,
 }: SpecialRequestSectionProps) {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
+
   const [showInput, setShowInput] = useState(false);
   const [requestText, setRequestText] = useState(specialRequest);
+  const [selectedImage, setSelectedImage] = useState<SpecialRequestImageFile | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = useState<string | null>(specialRequestImage);
+  const [imageRemoved, setImageRemoved] = useState(false);
+  const [previewModalVisible, setPreviewModalVisible] = useState(false);
+  const [previewImageUri, setPreviewImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     if (specialRequest !== undefined) {
-      setRequestText(specialRequest);
+      setRequestText(specialRequest || '');
+      if (!specialRequest) {
+        setShowInput(false);
+      }
     }
   }, [specialRequest]);
 
+  useEffect(() => {
+    if (specialRequestImage !== undefined) {
+      setExistingImageUrl(specialRequestImage);
+      if (!specialRequestImage) {
+        setSelectedImage(null);
+        setImageRemoved(false);
+      } else {
+        setImageRemoved(false);
+      }
+    }
+  }, [specialRequestImage]);
+
+  const getImageUri = (imgSource: string | null): string | null => {
+    if (!imgSource) return null;
+    if (
+      imgSource.startsWith('http://') ||
+      imgSource.startsWith('https://') ||
+      imgSource.startsWith('file:') ||
+      imgSource.startsWith('content:')
+    ) {
+      return imgSource;
+    }
+    return `${BASE_URL}${imgSource.startsWith('/') ? '' : '/'}${imgSource}`;
+  };
+
   const handleAddPress = () => {
     setRequestText(specialRequest);
+    setSelectedImage(null);
+    setExistingImageUrl(specialRequestImage);
+    setImageRemoved(false);
     setShowInput(true);
     if (onAddPress) onAddPress();
   };
 
+  const handleTakePhoto = () => {
+    launchCamera(
+      {
+        mediaType: 'photo',
+        includeBase64: false,
+        maxHeight: 1200,
+        maxWidth: 1200,
+        quality: 0.8,
+        saveToPhotos: false,
+      },
+      response => {
+        if (response.didCancel) {
+          console.log('User cancelled camera');
+        } else if (response.errorMessage) {
+          console.log('Camera Error: ', response.errorMessage);
+          Alert.alert('Error', response.errorMessage);
+        } else if (response.assets && response.assets.length > 0) {
+          const asset = response.assets[0];
+          if (asset.uri) {
+            setSelectedImage({
+              uri: asset.uri,
+              name: asset.fileName || `special_request_${Date.now()}.jpg`,
+              type: asset.type || 'image/jpeg',
+            });
+            setExistingImageUrl(null);
+            setImageRemoved(false);
+          }
+        }
+      },
+    );
+  };
+
+  const handleChooseFromLibrary = () => {
+    launchImageLibrary(
+      {
+        mediaType: 'photo',
+        includeBase64: false,
+        maxHeight: 1200,
+        maxWidth: 1200,
+        quality: 0.8,
+      },
+      response => {
+        if (response.didCancel) {
+          console.log('User cancelled image picker');
+        } else if (response.errorMessage) {
+          console.log('ImagePicker Error: ', response.errorMessage);
+          Alert.alert('Error', response.errorMessage);
+        } else if (response.assets && response.assets.length > 0) {
+          const asset = response.assets[0];
+          if (asset.uri) {
+            setSelectedImage({
+              uri: asset.uri,
+              name: asset.fileName || `special_request_${Date.now()}.jpg`,
+              type: asset.type || 'image/jpeg',
+            });
+            setExistingImageUrl(null);
+            setImageRemoved(false);
+          }
+        }
+      },
+    );
+  };
+
+  const handleImagePickerPress = () => {
+    Alert.alert(
+      isArabic ? 'رفع صورة' : 'Upload Image',
+      isArabic ? 'اختر طريقة رفع الصورة' : 'Choose an option to upload an image',
+      [
+        {
+          text: isArabic ? 'التقاط صورة' : 'Take Photo',
+          onPress: handleTakePhoto,
+        },
+        {
+          text: isArabic ? 'اختيار من المعرض' : 'Choose from Library',
+          onPress: handleChooseFromLibrary,
+        },
+        {
+          text: isArabic ? 'إلغاء' : 'Cancel',
+          style: 'cancel',
+        },
+      ],
+    );
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setExistingImageUrl(null);
+    setImageRemoved(true);
+  };
+
   const handleSave = () => {
     if (onSave) {
-      onSave(requestText.trim());
+      const imgParam = selectedImage
+        ? selectedImage
+        : imageRemoved
+        ? null
+        : undefined;
+      onSave(requestText.trim(), imgParam);
     }
     setShowInput(false);
   };
+
+  const currentDisplayImageUri =
+    selectedImage?.uri || getImageUri(existingImageUrl);
+
+  const hasSavedContent =
+    (specialRequest && specialRequest.trim().length > 0) ||
+    !!specialRequestImage;
 
   return (
     <View style={styles.container}>
@@ -58,12 +215,12 @@ export default function SpecialRequestSection({
             { color: colors.text, fontFamily: colors.fontBold },
           ]}
         >
-          Any special request
+          {isArabic ? 'أي طلب خاص' : 'Any special request'}
         </Text>
       </View>
 
       {!showInput ? (
-        specialRequest ? (
+        hasSavedContent ? (
           <View
             style={[
               styles.savedContainer,
@@ -73,20 +230,62 @@ export default function SpecialRequestSection({
               },
             ]}
           >
-            <Text
-              style={[
-                styles.savedText,
-                { color: colors.text, fontFamily: colors.fontRegular },
-              ]}
-            >
-              {specialRequest}
-            </Text>
+            <View style={styles.savedContent}>
+              {specialRequest ? (
+                <Text
+                  style={[
+                    styles.savedText,
+                    { color: colors.text, fontFamily: colors.fontRegular },
+                  ]}
+                >
+                  {specialRequest}
+                </Text>
+              ) : null}
+
+              {specialRequestImage ? (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  style={styles.savedImageThumbWrapper}
+                  onPress={() => {
+                    const uri = getImageUri(specialRequestImage);
+                    if (uri) {
+                      setPreviewImageUri(uri);
+                      setPreviewModalVisible(true);
+                    }
+                  }}
+                >
+                  <Image
+                    source={{ uri: getImageUri(specialRequestImage)! }}
+                    style={styles.savedImageThumb}
+                    resizeMode="cover"
+                  />
+                  <Text
+                    style={[
+                      styles.savedImageLabel,
+                      { color: colors.textMuted, fontFamily: colors.fontRegular },
+                    ]}
+                  >
+                    {isArabic ? 'صورة مرفقة' : 'Image attached'} 🔍
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
             <TouchableOpacity
               style={[
                 styles.editBtn,
-                { borderColor: colors.borderSubtle, backgroundColor: colors.background },
+                {
+                  borderColor: colors.borderSubtle,
+                  backgroundColor: colors.background,
+                },
               ]}
-              onPress={() => setShowInput(true)}
+              onPress={() => {
+                setRequestText(specialRequest);
+                setSelectedImage(null);
+                setExistingImageUrl(specialRequestImage);
+                setImageRemoved(false);
+                setShowInput(true);
+              }}
             >
               <Text
                 style={[
@@ -94,13 +293,19 @@ export default function SpecialRequestSection({
                   { color: colors.primary, fontFamily: colors.fontRegular },
                 ]}
               >
-                Edit
+                {isArabic ? 'تعديل' : 'Edit'}
               </Text>
             </TouchableOpacity>
           </View>
         ) : (
           <TouchableOpacity
-            style={[styles.addBtn, { borderColor: colors.borderSubtle, backgroundColor: colors.background }]}
+            style={[
+              styles.addBtn,
+              {
+                borderColor: colors.borderSubtle,
+                backgroundColor: colors.background,
+              },
+            ]}
             onPress={handleAddPress}
           >
             <Text
@@ -109,7 +314,7 @@ export default function SpecialRequestSection({
                 { color: colors.darkBrown, fontFamily: colors.fontRegular },
               ]}
             >
-              Add+
+              {isArabic ? '+ إضافة' : 'Add+'}
             </Text>
           </TouchableOpacity>
         )
@@ -125,7 +330,11 @@ export default function SpecialRequestSection({
                 backgroundColor: colors.inputBackground || colors.background,
               },
             ]}
-            placeholder="Specify the product name for your request (e.g. Add extra spice to soup)"
+            placeholder={
+              isArabic
+                ? 'حدد اسم المنتج لطلبك (مثال: إضافة بهارات إضافية للحساء)'
+                : 'Specify the product name for your request (e.g. Add extra spice to soup)'
+            }
             placeholderTextColor={colors.textMuted}
             value={requestText}
             onChangeText={setRequestText}
@@ -134,12 +343,97 @@ export default function SpecialRequestSection({
             textAlignVertical="top"
             autoFocus
           />
+
+          {/* Image Attachment Row */}
+          {currentDisplayImageUri ? (
+            <View
+              style={[
+                styles.imagePreviewContainer,
+                {
+                  borderColor: colors.borderSubtle,
+                  backgroundColor: colors.card,
+                },
+              ]}
+            >
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onPress={() => {
+                  setPreviewImageUri(currentDisplayImageUri);
+                  setPreviewModalVisible(true);
+                }}
+              >
+                <Image
+                  source={{ uri: currentDisplayImageUri }}
+                  style={styles.imagePreviewThumb}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+              <View style={styles.imageInfo}>
+                <Text
+                  style={[
+                    styles.imageNameText,
+                    { color: colors.text, fontFamily: colors.fontMedium },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectedImage?.name || (isArabic ? 'صورة الطلب' : 'Special request photo')}
+                </Text>
+                <TouchableOpacity
+                  onPress={handleImagePickerPress}
+                  style={styles.changeImageBtn}
+                >
+                  <Text style={[styles.changeImageText, { color: colors.primary }]}>
+                    {isArabic ? 'تغيير' : 'Change'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity
+                onPress={handleRemoveImage}
+                style={styles.removeIconBtn}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <Text style={styles.removeIconText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[
+                styles.uploadImageBtn,
+                {
+                  borderColor: colors.borderSubtle,
+                  backgroundColor: colors.inputBackground || colors.background,
+                },
+              ]}
+              onPress={handleImagePickerPress}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.uploadIcon}>📷</Text>
+              <Text
+                style={[
+                  styles.uploadImageText,
+                  { color: colors.primary, fontFamily: colors.fontMedium },
+                ]}
+              >
+                {isArabic ? 'رفع صورة' : 'Upload Image'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[styles.cancelBtn, { borderColor: colors.borderSubtle, backgroundColor: colors.background }]}
+              style={[
+                styles.cancelBtn,
+                {
+                  borderColor: colors.borderSubtle,
+                  backgroundColor: colors.background,
+                },
+              ]}
               onPress={() => {
                 setShowInput(false);
                 setRequestText(specialRequest);
+                setSelectedImage(null);
+                setExistingImageUrl(specialRequestImage);
+                setImageRemoved(false);
               }}
             >
               <Text
@@ -151,7 +445,7 @@ export default function SpecialRequestSection({
                   },
                 ]}
               >
-                Cancel
+                {isArabic ? 'إلغاء' : 'Cancel'}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -164,12 +458,36 @@ export default function SpecialRequestSection({
                   { color: '#FFFFFF', fontFamily: colors.fontSemiBold },
                 ]}
               >
-                Save
+                {isArabic ? 'حفظ' : 'Save'}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       )}
+
+      {/* Image Preview Modal */}
+      <Modal
+        visible={previewModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <TouchableOpacity
+            style={styles.modalCloseBtn}
+            onPress={() => setPreviewModalVisible(false)}
+          >
+            <Text style={styles.modalCloseText}>✕</Text>
+          </TouchableOpacity>
+          {previewImageUri ? (
+            <Image
+              source={{ uri: previewImageUri }}
+              style={styles.modalFullImage}
+              resizeMode="contain"
+            />
+          ) : null}
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -205,16 +523,33 @@ const styles = StyleSheet.create({
   savedContainer: {
     borderWidth: 1,
     borderRadius: sw(12),
-    padding: sw(16),
+    padding: sw(14),
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  savedText: {
-    fontSize: fs(14),
+  savedContent: {
     flex: 1,
     marginRight: sw(12),
+  },
+  savedText: {
+    fontSize: fs(14),
     lineHeight: fs(20),
+  },
+  savedImageThumbWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: sh(8),
+    gap: sw(8),
+  },
+  savedImageThumb: {
+    width: sw(48),
+    height: sw(48),
+    borderRadius: sw(8),
+    backgroundColor: '#EEEEEE',
+  },
+  savedImageLabel: {
+    fontSize: fs(12),
   },
   editBtn: {
     borderWidth: 1,
@@ -235,10 +570,72 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
     minHeight: sh(80),
   },
+  uploadImageBtn: {
+    marginTop: sh(10),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: sh(10),
+    paddingHorizontal: sw(14),
+    borderRadius: sw(10),
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: sw(8),
+  },
+  uploadIcon: {
+    fontSize: fs(16),
+  },
+  uploadImageText: {
+    fontSize: fs(13),
+  },
+  imagePreviewContainer: {
+    marginTop: sh(10),
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: sw(10),
+    borderRadius: sw(10),
+    borderWidth: 1,
+    gap: sw(12),
+  },
+  imagePreviewThumb: {
+    width: sw(56),
+    height: sw(56),
+    borderRadius: sw(8),
+    backgroundColor: '#EEEEEE',
+  },
+  imageInfo: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  imageNameText: {
+    fontSize: fs(13),
+    marginBottom: sh(4),
+  },
+  changeImageBtn: {
+    paddingVertical: sh(2),
+    alignSelf: 'flex-start',
+  },
+  changeImageText: {
+    fontSize: fs(12),
+    fontWeight: '600',
+  },
+  removeIconBtn: {
+    width: sw(26),
+    height: sw(26),
+    borderRadius: sw(13),
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeIconText: {
+    fontSize: fs(12),
+    color: '#6B7280',
+    fontWeight: '600',
+  },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: sh(12),
+    marginTop: sh(14),
     gap: sw(12),
   },
   cancelBtn: {
@@ -257,5 +654,33 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     fontSize: fs(14),
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: sw(20),
+  },
+  modalCloseBtn: {
+    position: 'absolute',
+    top: sh(50),
+    right: sw(20),
+    width: sw(40),
+    height: sw(40),
+    borderRadius: sw(20),
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  modalCloseText: {
+    color: '#FFFFFF',
+    fontSize: fs(20),
+    fontWeight: 'bold',
+  },
+  modalFullImage: {
+    width: '100%',
+    height: '80%',
   },
 });

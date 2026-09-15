@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Offer } from '../../services/api/offer';
 import { BASE_URL } from '../../constants/api';
+import { prefetchOffersImages } from '../../utils/imagePrefetch';
 
 interface PromoBannersSectionProps {
   offers: Offer[];
@@ -22,9 +23,16 @@ function PromoBannersSection({
   offers,
   onPromoPress,
 }: PromoBannersSectionProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (offers && offers.length > 0) {
+      prefetchOffersImages(offers);
+    }
+  }, [offers]);
 
   if (!offers || offers.length === 0) {
     return null;
@@ -45,13 +53,22 @@ function PromoBannersSection({
             onPress={() => onPromoPress?.(offer, i)}
           >
             {/* Offer Banner Image */}
-            {offer.image_en && (
-              <Image
-                source={{ uri: `${BASE_URL}${offer.image_en}` }}
-                style={styles.offerImage}
-                resizeMode="cover"
-              />
-            )}
+            {(() => {
+              const offerImage = isArabic
+                ? offer.image_ar || offer.image_en
+                : offer.image_en || offer.image_ar;
+              return offerImage ? (
+                <Image
+                  source={{
+                    uri: `${BASE_URL}${offerImage}`,
+                    cache: 'force-cache',
+                  }}
+                  style={styles.offerImage}
+                  resizeMode="cover"
+                  fadeDuration={0}
+                />
+              ) : null;
+            })()}
 
             {/* Order Now Button */}
             <View style={styles.bottomSection}>

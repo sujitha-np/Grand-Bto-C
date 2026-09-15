@@ -19,6 +19,7 @@ import { addonsService } from '../services/api/addons';
 import { settingsService } from '../services/api/settings';
 import { notificationService } from '../services/api/notification';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const useNotifications = (customerId?: string | number) => {
   return useQuery({
@@ -47,16 +48,8 @@ export const useDepartments = () => {
   return useQuery({
     queryKey: ['departments'],
     queryFn: () => departmentService.getDepartments(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
-  });
-};
-
-export const useWorkingTime = () => {
-  return useQuery({
-    queryKey: ['working-time'],
-    queryFn: () => settingsService.getWorkingTime(),
-    staleTime: 60 * 1000, // 1 minute
-    refetchInterval: 60 * 1000, // auto refetch every 1 minute
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
   });
 };
 
@@ -64,7 +57,8 @@ export const useCategories = () => {
   return useQuery({
     queryKey: ['categories'],
     queryFn: () => categoryService.getCategories(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
   });
 };
 
@@ -72,7 +66,8 @@ export const useOffers = () => {
   return useQuery({
     queryKey: ['offers'],
     queryFn: () => offerService.getOffers(),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 60 * 60 * 1000, // 1 hour
   });
 };
 
@@ -454,11 +449,13 @@ export const useSpecialRequest = () => {
       cartId: string;
       customerId: string;
       specialRequest: string;
+      specialRequestImage?: { uri: string; name?: string; type?: string } | null;
     }) => {
       return cartService.specialRequest(
         params.cartId,
         params.customerId,
         params.specialRequest,
+        params.specialRequestImage,
       );
     },
     onSuccess: (data, variables) => {
@@ -637,7 +634,10 @@ export const useCheckout = () => {
             text1: 'Order Placed',
             text2: data.message || 'Your order has been placed successfully!',
           });
-          // Invalidate cart queries to clear the cart after checkout
+          // Invalidate and remove cart queries to clear the cart after checkout
+          queryClient.removeQueries({
+            queryKey: ['cart'],
+          });
           queryClient.invalidateQueries({
             queryKey: ['cart'],
           });
@@ -645,6 +645,14 @@ export const useCheckout = () => {
           queryClient.invalidateQueries({
             queryKey: ['orders'],
           });
+          AsyncStorage.getAllKeys().then(keys => {
+            const specialReqKeys = keys.filter(
+              k => k.startsWith('special_request_') || k.startsWith('special_request'),
+            );
+            if (specialReqKeys.length > 0) {
+              AsyncStorage.multiRemove(specialReqKeys).catch(() => {});
+            }
+          }).catch(() => {});
         }
       } else {
         Toast.show({

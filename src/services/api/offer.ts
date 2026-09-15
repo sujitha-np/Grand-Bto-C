@@ -1,5 +1,8 @@
 import apiClient from './client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { prefetchOffersImages } from '../../utils/imagePrefetch';
+
+const OFFERS_CACHE_KEY = '@cache_home_offers';
 
 export interface OfferProduct {
   id: number;
@@ -54,14 +57,8 @@ export interface Offer {
 export const offerService = {
   getOffers: async () => {
     try {
-      console.log('About to call offers API...');
-
       // Get token manually
       const token = await AsyncStorage.getItem('userToken');
-      console.log(
-        'Offers - Token:',
-        token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
-      );
 
       // Use 'bearer' header instead of 'Authorization'
       const { data } = await apiClient.post('/products/offers', {}, {
@@ -69,30 +66,51 @@ export const offerService = {
           bearer: token,
         },
       });
-      console.log('Raw offers API response:', data);
 
       if (data?.success === false || data?.error) {
-        console.log('API returned success:false or error:', data);
         throw new Error('Failed to fetch offers');
+      }
+
+      if (data?.data && Array.isArray(data.data)) {
+        AsyncStorage.setItem(OFFERS_CACHE_KEY, JSON.stringify(data)).catch(() => {});
+        prefetchOffersImages(data.data);
       }
 
       return data;
     } catch (error: any) {
       console.log('Offers API error:', error);
-      console.log('Error details:', JSON.stringify(error));
+      // Fallback to cached offers on failure
+      try {
+        const cached = await AsyncStorage.getItem(OFFERS_CACHE_KEY);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed?.data?.length) {
+            return parsed;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+
       if (error.response?.data) {
-        console.log(
-          'Error response data:',
-          JSON.stringify(error.response.data, null, 2),
-        );
-        console.log('Error response status:', error.response.status);
-        console.log('Error response message:', error.response.data?.message);
         throw new Error(
           error.response.data?.message || 'Failed to fetch offers',
         );
       }
       throw error;
     }
+  },
+
+  getCachedOffers: async () => {
+    try {
+      const cached = await AsyncStorage.getItem(OFFERS_CACHE_KEY);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      // ignore
+    }
+    return null;
   },
 
   getOfferedProducts: async (offerId: number) => {

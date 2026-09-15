@@ -25,7 +25,8 @@ interface CouponScreenProps {
 }
 
 function CouponScreen({ onBack }: CouponScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -90,7 +91,9 @@ function CouponScreen({ onBack }: CouponScreenProps) {
         </ImageBackground>
 
         <View style={styles.couponContent}>
-          <Text style={styles.couponTitle}>{item.name_en}</Text>
+          <Text style={styles.couponTitle}>
+            {isArabic ? item.name_ar || item.name_en : item.name_en || item.name_ar}
+          </Text>
           <Text style={styles.couponCode}>Code: #########</Text>
           <View style={styles.expiryRow}>
             <Image

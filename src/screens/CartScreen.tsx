@@ -71,29 +71,42 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
   const { mutate: saveSpecialRequest } = useSpecialRequest();
   const [refreshing, setRefreshing] = useState(false);
   const [specialRequest, setSpecialRequest] = useState<string>('');
+  const [specialRequestImage, setSpecialRequestImage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadPersistedSpecialRequest = async () => {
-      if (cartData?.cart_id) {
+      if (cartData?.cart_id && items.length > 0) {
         try {
-          const persisted = await AsyncStorage.getItem(`special_request_${cartData.cart_id}`);
-          if (persisted !== null) {
-            setSpecialRequest(persisted);
-          } else if (cartResponse?.data) {
-            const cartSpecialRequest =
-              (cartResponse.data as any)?.cart?.special_request ||
-              (cartResponse.data as any)?.special_request;
-            if (cartSpecialRequest !== undefined && cartSpecialRequest !== null) {
-              setSpecialRequest(cartSpecialRequest);
-            }
-          }
+          const persistedText = await AsyncStorage.getItem(`special_request_${cartData.cart_id}`);
+          const persistedImg = await AsyncStorage.getItem(`special_request_image_${cartData.cart_id}`);
+
+          setSpecialRequest(persistedText !== null ? persistedText : '');
+          setSpecialRequestImage(persistedImg !== null ? persistedImg : null);
         } catch (e) {
           console.error('Failed to load persisted special request', e);
         }
+      } else {
+        setSpecialRequest('');
+        setSpecialRequestImage(null);
       }
     };
     loadPersistedSpecialRequest();
-  }, [cartData?.cart_id, cartResponse]);
+  }, [cartData?.cart_id, items.length]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setSpecialRequest('');
+      setSpecialRequestImage(null);
+      AsyncStorage.getAllKeys().then(keys => {
+        const specialReqKeys = keys.filter(
+          k => k.startsWith('special_request_') || k.startsWith('special_request'),
+        );
+        if (specialReqKeys.length > 0) {
+          AsyncStorage.multiRemove(specialReqKeys).catch(() => {});
+        }
+      }).catch(() => {});
+    }
+  }, [items.length]);
 
   useEffect(() => {
     if (cartResponse !== undefined) {
@@ -194,11 +207,10 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
       ) : isError ? (
         <View style={styles.loadingContainer}>
           <Text style={{ color: colors.textMuted, textAlign: 'center' }}>
-            {'Failed to load cart.\n' +
-              ((error as any)?.message || 'Unknown error')}
+            {((error as any)?.message)}
           </Text>
           <TouchableOpacity onPress={() => refetch()} style={{ marginTop: 12 }}>
-            <Text style={{ color: colors.primary }}>Retry</Text>
+            {/* <Text style={{ color: colors.primary }}>Retry</Text> */}
           </TouchableOpacity>
         </View>
       ) : (
@@ -248,18 +260,20 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
               <SpecialRequestSection
                 colors={colors}
                 specialRequest={specialRequest}
+                specialRequestImage={specialRequestImage}
                 onAddPress={() => {
                   setTimeout(() => {
                     scrollViewRef.current?.scrollToEnd({ animated: true });
                   }, 200);
                 }}
-                onSave={text => {
+                onSave={(text, imageObj) => {
                   if (customerId && cartData?.cart_id) {
                     saveSpecialRequest(
                       {
                         cartId: String(cartData.cart_id),
                         customerId,
                         specialRequest: text,
+                        specialRequestImage: imageObj,
                       },
                       {
                         onSuccess: async (data) => {
@@ -267,16 +281,27 @@ const CartScreen: React.FC<CartScreenProps> = ({ onBack, onSelectDate }) => {
                             ? (data.data.special_request || '')
                             : text;
 
+                          const updatedImage = (data.success && data.data?.special_request_image !== undefined)
+                            ? data.data.special_request_image
+                            : imageObj?.uri || (imageObj === null ? null : specialRequestImage);
+
                           try {
                             if (updatedText.trim() === '') {
                               await AsyncStorage.removeItem(`special_request_${cartData.cart_id}`);
                             } else {
                               await AsyncStorage.setItem(`special_request_${cartData.cart_id}`, updatedText);
                             }
+
+                            if (!updatedImage) {
+                              await AsyncStorage.removeItem(`special_request_image_${cartData.cart_id}`);
+                            } else {
+                              await AsyncStorage.setItem(`special_request_image_${cartData.cart_id}`, updatedImage);
+                            }
                           } catch (e) {
                             console.error('Failed to save special request to storage', e);
                           }
                           setSpecialRequest(updatedText);
+                          setSpecialRequestImage(updatedImage || null);
                         },
                       }
                     );

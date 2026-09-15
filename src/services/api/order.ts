@@ -142,7 +142,7 @@ export const orderService = {
     console.log('🚫 [Cancel Order API] Initiating Request:');
     console.log('URL:', url);
     console.log('Payload:', cancelData);
-    console.log('Token:', token ? `${token.substring(0, 20)}...` : 'NOT FOUND');
+    console.log('Token:', token || 'NOT FOUND');
 
     const formData = new FormData();
     formData.append('order_id', String(cancelData.order_id));

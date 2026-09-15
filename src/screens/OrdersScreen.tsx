@@ -28,7 +28,8 @@ interface OrdersScreenProps {
 }
 
 function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const insets = useSafeAreaInsets();
 
@@ -161,15 +162,15 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
 
   const promptCancelOrder = (order: Order) => {
     Alert.alert(
-      'Cancel Order',
-      'Are you sure you want to cancel this order?',
+      t('orders.cancelConfirmTitle'),
+      t('orders.cancelConfirmMessage'),
       [
         {
-          text: 'No',
+          text: t('orders.no'),
           style: 'cancel',
         },
         {
-          text: 'Yes, Cancel',
+          text: t('orders.yesCancel'),
           style: 'destructive',
           onPress: () => handleCancelOrder(order),
         },
@@ -206,7 +207,9 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
           ]}
           numberOfLines={1}
         >
-          {item.item_name}
+          {isArabic
+            ? item.product?.name_ar || item.item_name
+            : item.item_name || item.product?.name_en}
         </Text>
         <Text
           style={[
@@ -214,7 +217,9 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
             { color: colors.textMuted, fontFamily: colors.fontRegular },
           ]}
         >
-          {item.product?.department?.name_en || ''}
+          {isArabic
+            ? item.product?.department?.name_ar || item.product?.department?.name_en || ''
+            : item.product?.department?.name_en || item.product?.department?.name_ar || ''}
         </Text>
         <Text
           style={[
@@ -222,7 +227,7 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
             { color: colors.textMuted, fontFamily: colors.fontRegular },
           ]}
         >
-          Qty: {item.item_quantity}
+          {t('orders.qty')}: {item.item_quantity}
         </Text>
       </View>
       <Text
@@ -258,7 +263,7 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
                   { color: colors.text, fontFamily: colors.fontSemiBold },
                 ]}
               >
-                Order #{order.unique_id}
+                {t('orders.order')} #{order.unique_id}
               </Text>
               <Text
                 style={[
@@ -313,8 +318,8 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
               ]}
             >
               {isExpanded
-                ? 'Show Less'
-                : `+ ${order.items.length - 1} more items`}
+                ? t('orders.showLess')
+                : t('orders.moreItems', { count: order.items.length - 1 })}
             </Text>
           </TouchableOpacity>
         )}
@@ -326,7 +331,7 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
               { color: colors.textMuted, fontFamily: colors.fontRegular },
             ]}
           >
-            Total Amount
+            {t('orders.totalAmount')}
           </Text>
           <Text
             style={[
@@ -349,7 +354,7 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
               {isCancellingOrder && cancellingOrderId === order.id ? (
                 <ActivityIndicator size="small" color="#FF3B30" />
               ) : (
-                <Text style={styles.cancelButtonText}>Cancel Order</Text>
+                <Text style={styles.cancelButtonText}>{t('orders.cancelOrder')}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -402,7 +407,7 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
       ) : orders.length === 0 ? (
         <View style={styles.emptyContainer}>
           <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-            No orders found for this date
+            {t('orders.noOrders')}
           </Text>
         </View>
       ) : (
@@ -428,13 +433,13 @@ function OrdersScreen({ initialDate, onClearInitialDate }: OrdersScreenProps) {
           <View style={styles.dateInfoContainer}>
             <View style={styles.dateInfo}>
               <Text style={[styles.dateLabel, { color: colors.text }]}>
-                Ordered on:{' '}
+                {t('orders.orderedOn')}:{' '}
                 {getOrderDateDisplay()}
               </Text>
             </View>
             <View style={styles.dateInfo}>
               <Text style={[styles.dateLabel, { color: colors.text }]}>
-                Delivery:{' '}
+                {t('orders.delivery')}:{' '}
                 {new Date(selectedDate).toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',

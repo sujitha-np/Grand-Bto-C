@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
-import { useOfferedProducts, useAddToCart } from '../hooks/queries';
+import { useOfferedProducts, useAddToCart, useCart } from '../hooks/queries';
 import { fs, sw, sh } from '../utils/responsive';
 import { BASE_URL } from '../constants/api';
 import { Product } from '../services/api/product';
@@ -25,6 +25,7 @@ interface OfferedProductsScreenProps {
   offerName: string;
   onBack: () => void;
   onShowProductDetail: (product: Product) => void;
+  onShowCart?: () => void;
 }
 
 function OfferedProductsScreen({
@@ -32,17 +33,40 @@ function OfferedProductsScreen({
   offerName,
   onBack,
   onShowProductDetail,
+  onShowCart,
 }: OfferedProductsScreenProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
+  const today = new Date().toISOString().split('T')[0];
   const { mutateAsync: addToCart } = useAddToCart();
+  const { data: cartResponse } = useCart(customerId, today);
+
+  const cartItems: any[] = React.useMemo(() => {
+    const cartData = (cartResponse?.data as any)?.cart;
+    if (cartData?.items && Array.isArray(cartData.items)) {
+      return cartData.items;
+    }
+    if (Array.isArray(cartResponse?.data)) {
+      return cartResponse.data;
+    }
+    return [];
+  }, [cartResponse]);
+
+  const cartProductIds = React.useMemo(
+    () => new Set(cartItems.map((item: any) => String(item.product_id))),
+    [cartItems],
+  );
+
+  const isInCart = (productId: number | string) =>
+    cartProductIds.has(String(productId));
 
   const { data, isLoading, error } = useOfferedProducts(offerId);
 
   const offeredProducts = data?.data || [];
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
   useEffect(() => {
     const getCustomerId = async () => {
       const id = await AsyncStorage.getItem('customerId');
@@ -80,10 +104,13 @@ function OfferedProductsScreen({
         quantity: '1',
         preorderDate: today,
       });
+      const prodName = isArabic
+        ? product.name_ar || product.name_en
+        : product.name_en || product.name_ar;
       Toast.show({
         type: 'success',
         text1: 'Added to Cart',
-        text2: `${product.name_en} - ${parseFloat(offerPrice).toFixed(2)} QAR`,
+        text2: `${prodName} - ${parseFloat(offerPrice).toFixed(2)} QAR`,
       });
     } catch (err: any) {
       Toast.show({
@@ -109,7 +136,9 @@ function OfferedProductsScreen({
         />
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>
-            {product.name_en}
+            {isArabic
+              ? product.name_ar || product.name_en
+              : product.name_en || product.name_ar}
           </Text>
           <View style={styles.priceContainer}>
             <Text style={styles.offerPrice}>{parseFloat(item.offer_price).toFixed(2)} QAR</Text>
@@ -120,9 +149,19 @@ function OfferedProductsScreen({
           <TouchableOpacity
             style={styles.addButton}
             activeOpacity={0.7}
-            onPress={() => handleAddToCart(product, item.offer_price)}
+            onPress={() => {
+              if (isInCart(product.id)) {
+                onShowCart?.();
+              } else {
+                handleAddToCart(product, item.offer_price);
+              }
+            }}
           >
-            <Text style={styles.addButtonText}>{t('home.orderNow')}</Text>
+            <Text style={styles.addButtonText}>
+              {isInCart(product.id)
+                ? t('home.viewInCart')
+                : t('home.orderNow')}
+            </Text>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>

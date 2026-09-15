@@ -29,7 +29,8 @@ interface OrderHistoryScreenProps {
 type FilterType = 'all' | 'completed' | 'cancelled';
 
 const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const [customerId, setCustomerId] = useState<string | undefined>(undefined);
@@ -197,7 +198,11 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
           style={styles.orderItemImage}
         />
         <View style={styles.orderItemDetails}>
-          <Text style={styles.orderItemName}>{item.item_name}</Text>
+          <Text style={styles.orderItemName}>
+            {isArabic
+              ? item.product?.name_ar || item.item_name
+              : item.item_name || item.product?.name_en}
+          </Text>
           <Text style={styles.orderItemQuantity}>x{item.item_quantity}</Text>
           {isCompleted && (
             <View
@@ -281,15 +286,15 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
 
   const promptCancelOrder = (order: Order) => {
     Alert.alert(
-      'Cancel Order',
-      'Are you sure you want to cancel this order?',
+      t('orders.cancelConfirmTitle'),
+      t('orders.cancelConfirmMessage'),
       [
         {
-          text: 'No',
+          text: t('orders.no'),
           style: 'cancel',
         },
         {
-          text: 'Yes, Cancel',
+          text: t('orders.yesCancel'),
           style: 'destructive',
           onPress: () => handleCancelOrder(order),
         },
@@ -325,7 +330,7 @@ const OrderHistoryScreen: React.FC<OrderHistoryScreenProps> = ({ onBack }) => {
               {isCancellingOrder && cancellingOrderId === order.id ? (
                 <ActivityIndicator size="small" color="#FF3B30" />
               ) : (
-                <Text style={styles.cancelButtonText}>Cancel Order</Text>
+                <Text style={styles.cancelButtonText}>{t('orders.cancelOrder')}</Text>
               )}
             </TouchableOpacity>
           </View>

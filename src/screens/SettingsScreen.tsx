@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Alert,
   I18nManager,
   Image,
   StatusBar,
@@ -13,7 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { useAppDispatch, useAppSelector } from '../store/hooks';
 import { setLanguage } from '../store/languageSlice';
 import { toggleTheme } from '../store/themeSlice';
-import { Language, LANGUAGES } from '../i18n';
+import { Language, LANGUAGES, applyLanguage } from '../i18n';
 import i18n from '../i18n';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
@@ -62,10 +63,24 @@ function SettingsScreen({ onBack, onNavigateToAddresses }: SettingsScreenProps) 
 
   const handleLanguageToggle = () => {
     const nextLang: Language = currentLanguage === 'en' ? 'ar' : 'en';
-    const isRTL = nextLang === LANGUAGES.ar;
-    i18n.changeLanguage(nextLang);
-    dispatch(setLanguage(nextLang));
-    I18nManager.forceRTL(isRTL);
+    const targetLabel = nextLang === 'ar' ? 'العربية' : 'English';
+    Alert.alert(
+      t('settings.changeLanguageTitle'),
+      t('settings.changeLanguageConfirm', { language: targetLabel }),
+      [
+        {
+          text: t('settings.cancel'),
+          style: 'cancel',
+        },
+        {
+          text: t('settings.change'),
+          onPress: async () => {
+            dispatch(setLanguage(nextLang));
+            await applyLanguage(nextLang, true);
+          },
+        },
+      ],
+    );
   };
 
   return (

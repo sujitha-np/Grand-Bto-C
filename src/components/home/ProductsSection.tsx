@@ -10,12 +10,12 @@ import { useTranslation } from 'react-i18next';
 import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Product } from '../../services/api/product';
-import { WorkingTimeResponse } from '../../services/api/settings';
 import { BASE_URL } from '../../constants/api';
 import {
   useWishlist,
   useAddToWishlist,
   useRemoveFromWishlist,
+  useCart,
 } from '../../hooks/queries';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
@@ -26,25 +26,45 @@ interface ProductsSectionProps {
   products: Product[];
   onProductPress?: (product: Product) => void;
   onAddPress?: (product: Product) => void;
-  isOpen?: boolean;
-  workingTime?: WorkingTimeResponse | null;
+  onShowCart?: () => void;
 }
 
 function ProductsSection({
   products,
   onProductPress,
   onAddPress,
-  isOpen = true,
-  workingTime,
+  onShowCart,
 }: ProductsSectionProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
+  const today = new Date().toISOString().split('T')[0];
 
   const { data: wishlistData } = useWishlist(customerId);
   const { mutateAsync: addToWishlist } = useAddToWishlist();
   const { mutateAsync: removeFromWishlist } = useRemoveFromWishlist();
+  const { data: cartResponse } = useCart(customerId, today);
+
+  const cartItems: any[] = React.useMemo(() => {
+    const cartData = (cartResponse?.data as any)?.cart;
+    if (cartData?.items && Array.isArray(cartData.items)) {
+      return cartData.items;
+    }
+    if (Array.isArray(cartResponse?.data)) {
+      return cartResponse.data;
+    }
+    return [];
+  }, [cartResponse]);
+
+  const cartProductIds = React.useMemo(
+    () => new Set(cartItems.map((item: any) => String(item.product_id))),
+    [cartItems],
+  );
+
+  const isInCart = (productId: number | string) =>
+    cartProductIds.has(String(productId));
 
   // Handle different possible response structures
   const wishlistItems = React.useMemo(() => {
@@ -106,63 +126,31 @@ function ProductsSection({
     }
   };
 
-  const showClosedToast = () => {
-    Toast.show({
-      type: 'info',
-      text1: t('home.storeClosed'),
-      text2: t('home.storeClosedDesc', {
-        start:
-          workingTime?.working_time_start_formatted ||
-          workingTime?.working_time_start ||
-          '07:00 AM',
-        end:
-          workingTime?.working_time_end_formatted ||
-          workingTime?.working_time_end ||
-          '10:00 PM',
-      }),
-    });
-  };
-
   return (
     <View style={styles.container}>
-      {!isOpen && (
-        <View style={styles.closedBanner}>
-          <View style={styles.closedBannerContent}>
-            <View style={styles.closedBadgePill}>
-              <View style={styles.closedDot} />
-              <Text style={styles.closedPillText}>{t('home.storeClosed')}</Text>
-            </View>
-            <Text style={styles.closedBannerTitle}>
-              {t('home.storeClosedDesc', {
-                start:
-                  workingTime?.working_time_start_formatted ||
-                  workingTime?.working_time_start ||
-                  '07:00 AM',
-                end:
-                  workingTime?.working_time_end_formatted ||
-                  workingTime?.working_time_end ||
-                  '10:00 PM',
-              })}
-            </Text>
-          </View>
-        </View>
-      )}
-
       <View style={styles.gridContainer}>
         {products.map(product => {
           const imageUrl = `${BASE_URL}${product.image}`;
           const isInWishlist = wishlistProductIds.has(product.id);
+          const isOutOrInactive =
+            product.status === 0 || product.product_status === 0;
+          const disabled = isOutOrInactive;
+
+          const getDisabledLabel = () => {
+            return t('common.unavailable');
+          };
+
           return (
             <TouchableOpacity
               key={product.id}
               style={[
                 styles.productCard,
-                !isOpen && styles.productCardDisabled,
+                disabled && styles.productCardDisabled,
               ]}
-              activeOpacity={isOpen ? 0.8 : 0.95}
+              activeOpacity={disabled ? 0.95 : 0.8}
+              disabled={isOutOrInactive}
               onPress={() => {
-                if (!isOpen) {
-                  showClosedToast();
+                if (isOutOrInactive) {
                   return;
                 }
                 onProductPress?.(product);
@@ -173,19 +161,15 @@ function ProductsSection({
                   source={{ uri: imageUrl }}
                   style={[
                     styles.productImage,
-                    !isOpen && styles.productImageDisabled,
+                    disabled && styles.productImageDisabled,
                   ]}
                   resizeMode="cover"
                 />
-                {!isOpen && (
+                {disabled && (
                   <View style={styles.closedImageOverlay}>
                     <View style={styles.closedOverlayTag}>
                       <Text style={styles.closedOverlayTagText}>
-                        {workingTime?.working_time_start_formatted
-                          ? t('home.opensAt', {
-                              time: workingTime.working_time_start_formatted,
-                            })
-                          : t('home.closedNotice')}
+                        {getDisabledLabel()}
                       </Text>
                     </View>
                   </View>
@@ -209,14 +193,18 @@ function ProductsSection({
                 <Text
                   style={[
                     styles.productName,
-                    !isOpen && styles.productNameDisabled,
+                    disabled && styles.productNameDisabled,
                   ]}
                   numberOfLines={1}
                 >
-                  {product.name_en}
+                  {isArabic
+                    ? product.name_ar || product.name_en
+                    : product.name_en || product.name_ar}
                 </Text>
                 <Text style={styles.productCategory}>
-                  {product.department?.name_en || 'Category'}
+                  {isArabic
+                    ? product.department?.name_ar || product.department?.name_en || ''
+                    : product.department?.name_en || product.department?.name_ar || 'Category'}
                 </Text>
                 {(product.preparation_time_formatted ||
                   product.preparation_time_minutes) && (
@@ -246,7 +234,7 @@ function ProductsSection({
                               <Text
                                 style={[
                                   styles.productPrice,
-                                  !isOpen && styles.productPriceDisabled,
+                                  disabled && styles.productPriceDisabled,
                                 ]}
                               >
                                 {parseFloat(offerPrice)
@@ -272,7 +260,7 @@ function ProductsSection({
                         <Text
                           style={[
                             styles.productPrice,
-                            !isOpen && styles.productPriceDisabled,
+                            disabled && styles.productPriceDisabled,
                           ]}
                         >
                           {parseFloat(displayPrice)
@@ -286,15 +274,17 @@ function ProductsSection({
                   <TouchableOpacity
                     style={[
                       styles.addButton,
-                      !isOpen && styles.addButtonDisabled,
+                      disabled && styles.addButtonDisabled,
+                      isInCart(product.id) && styles.viewCartButton,
                     ]}
-                    disabled={!isOpen}
+                    disabled={disabled}
                     onPress={() => {
-                      if (!isOpen) {
-                        showClosedToast();
+                      if (isOutOrInactive) {
                         return;
                       }
-                      if (onAddPress) {
+                      if (isInCart(product.id)) {
+                        onShowCart?.();
+                      } else if (onAddPress) {
                         onAddPress(product);
                       }
                     }}
@@ -302,10 +292,11 @@ function ProductsSection({
                     <Text
                       style={[
                         styles.addButtonText,
-                        !isOpen && styles.addButtonTextDisabled,
+                        disabled && styles.addButtonTextDisabled,
+                        isInCart(product.id) && styles.viewCartButtonText,
                       ]}
                     >
-                      +
+                      {isInCart(product.id) ? t('home.viewInCart') : '+'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -503,6 +494,18 @@ const createStyles = (colors: any) =>
     },
     addButtonTextDisabled: {
       color: '#8E8E93',
+    },
+    viewCartButton: {
+      width: 'auto',
+      height: 'auto',
+      paddingHorizontal: sw(8),
+      paddingVertical: sh(4),
+      borderRadius: sw(8),
+    },
+    viewCartButtonText: {
+      fontSize: fs(10),
+      marginTop: 0,
+      fontFamily: colors.fontBold,
     },
   });
 

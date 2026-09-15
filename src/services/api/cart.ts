@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../../constants/api';
 
@@ -22,17 +23,21 @@ export interface Cart {
   items: CartItem[];
   subtotal: number;
   total_amount: number;
+  total_product_count?: number | string;
   created_at: string;
   updated_at: string;
   special_request?: string | null;
+  special_request_image?: string | null;
 }
 
 export interface CartResponse {
   success: boolean;
   data: {
     customer_id: string;
+    total_product_count?: number | string;
     cart: Cart;
   };
+  total_product_count?: number | string;
 }
 
 export interface AddToCartResponse {
@@ -192,13 +197,29 @@ export const cartService = {
     cartId: string,
     customerId: string,
     specialRequest: string,
+    specialRequestImage?: { uri: string; name?: string; type?: string } | null,
   ): Promise<AddToCartResponse> => {
     const token = await AsyncStorage.getItem('userToken');
 
     const formData = new FormData();
-    formData.append('cart_id', cartId);
+    if (cartId) {
+      formData.append('cart_id', cartId);
+    }
     formData.append('customer_id', customerId);
     formData.append('special_request', specialRequest);
+
+    if (specialRequestImage && specialRequestImage.uri) {
+      const uri = specialRequestImage.uri;
+      formData.append('special_request_image', {
+        uri: Platform.OS === 'android' ? uri : uri.replace('file://', ''),
+        name: specialRequestImage.name || 'special_request.jpg',
+        type: specialRequestImage.type || 'image/jpeg',
+      } as any);
+    } else if (specialRequestImage === null) {
+      formData.append('special_request_image', '');
+      formData.append('remove_image', '1');
+      formData.append('clear_image', '1');
+    }
 
     const response = await fetch(
       `${BASE_URL}/api/customer/cart/special-request`,

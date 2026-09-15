@@ -13,7 +13,7 @@ apiClient.interceptors.request.use(async config => {
     const token = await AsyncStorage.getItem('userToken');
     console.log(
       'Interceptor - Token retrieved:',
-      token ? `${token.substring(0, 20)}...` : 'NO TOKEN',
+      token || 'NO TOKEN',
     );
     console.log('Interceptor - Request URL:', config.url);
     if (token) {

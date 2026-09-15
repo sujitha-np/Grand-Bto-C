@@ -289,7 +289,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
                   ? '#D0D0D0'
                   : colors.darkBrown,
                 fontFamily:
-                  isToday(day) || selected
+                  !past && (isToday(day) || selected)
                     ? colors.fontSemiBold
                     : colors.fontRegular,
               },

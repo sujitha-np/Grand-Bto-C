@@ -1,4 +1,8 @@
 {
+  "common": {
+    "outOfStock": "Out of Stock",
+    "unavailable": "Unavailable"
+  },
   "splash": {
     "getStarted": "Get Started"
   },
@@ -21,7 +25,11 @@
     "notifications": "Notifications",
     "darkTheme": "Dark Theme",
     "country": "Country",
-    "countryValue": "Qatar"
+    "countryValue": "Qatar",
+    "changeLanguageTitle": "Change Language",
+    "changeLanguageConfirm": "Are you sure you want to change the language to {{language}}?",
+    "cancel": "Cancel",
+    "change": "Change"
   },
   "register": {
     "title": "Register",
@@ -91,6 +99,7 @@
     "pizza": "Pizza",
     "fastFood": "Fast Food",
     "orderNow": "Order Now",
+    "viewInCart": "View in Cart",
     "homeTab": "Home",
     "ordersTab": "Orders",
     "accountTab": "Account",
@@ -225,5 +234,28 @@
     "pointHistory": "Point History",
     "seeAll": "See all",
     "noHistory": "No points history available"
+  },
+  "wishlist": {
+    "title": "My Wishlist",
+    "added": "Added",
+    "emptyTitle": "Your wishlist is empty",
+    "emptyText": "Add products you love to your wishlist",
+    "errorText": "Failed to load wishlist"
+  },
+  "orders": {
+    "title": "Orders",
+    "order": "Order",
+    "showLess": "Show Less",
+    "moreItems": "+ {{count}} more items",
+    "cancelOrder": "Cancel Order",
+    "cancelConfirmTitle": "Cancel Order",
+    "cancelConfirmMessage": "Are you sure you want to cancel this order?",
+    "no": "No",
+    "yesCancel": "Yes, Cancel",
+    "totalAmount": "Total Amount",
+    "qty": "Qty",
+    "noOrders": "No orders found for this date",
+    "orderedOn": "Ordered on",
+    "delivery": "Delivery"
   }
 }

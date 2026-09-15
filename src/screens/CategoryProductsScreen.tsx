@@ -18,12 +18,11 @@ import {
   useWishlist,
   useAddToWishlist,
   useRemoveFromWishlist,
-  useWorkingTime,
+  useCart,
 } from '../hooks/queries';
 import { fs, sw, sh } from '../utils/responsive';
 import { BASE_URL } from '../constants/api';
 import { Product } from '../services/api/product';
-import { isStoreOpen } from '../utils/workingTime';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import Header from '../components/common/Header';
@@ -35,6 +34,7 @@ interface CategoryProductsScreenProps {
   categoryName: string;
   onBack: () => void;
   onShowProductDetail: (product: Product) => void;
+  onShowCart?: () => void;
 }
 
 function CategoryProductsScreen({
@@ -42,6 +42,7 @@ function CategoryProductsScreen({
   categoryName,
   onBack,
   onShowProductDetail,
+  onShowCart,
 }: CategoryProductsScreenProps) {
   const { t, i18n } = useTranslation();
   const colors = useTheme();
@@ -49,34 +50,33 @@ function CategoryProductsScreen({
   const insets = useSafeAreaInsets();
   const [customerId, setCustomerId] = useState<string | undefined>();
   const [refreshing, setRefreshing] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
+  const today = new Date().toISOString().split('T')[0];
 
   const { mutateAsync: addToCart } = useAddToCart();
   const { data, isLoading, error, refetch } = useCategoryProducts(categoryId);
   const { data: wishlistData } = useWishlist(customerId);
   const { mutateAsync: addToWishlist } = useAddToWishlist();
   const { mutateAsync: removeFromWishlist } = useRemoveFromWishlist();
-  const { data: workingTimeData } = useWorkingTime();
+  const { data: cartResponse } = useCart(customerId, today);
 
-  const workingTime = workingTimeData?.success ? workingTimeData : null;
-
-  const isOpen = React.useMemo(() => {
-    if (!workingTime?.working_time_start || !workingTime?.working_time_end) {
-      return true;
+  const cartItems: any[] = React.useMemo(() => {
+    const cartData = (cartResponse?.data as any)?.cart;
+    if (cartData?.items && Array.isArray(cartData.items)) {
+      return cartData.items;
     }
-    return isStoreOpen(
-      workingTime.working_time_start,
-      workingTime.working_time_end,
-      currentTime,
-    );
-  }, [workingTime, currentTime]);
+    if (Array.isArray(cartResponse?.data)) {
+      return cartResponse.data;
+    }
+    return [];
+  }, [cartResponse]);
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30000);
-    return () => clearInterval(timer);
-  }, []);
+  const cartProductIds = React.useMemo(
+    () => new Set(cartItems.map((item: any) => String(item.product_id))),
+    [cartItems],
+  );
+
+  const isInCart = (productId: number | string) =>
+    cartProductIds.has(String(productId));
 
   const wishlistItems = React.useMemo(() => {
     if (!wishlistData) return [];
@@ -112,26 +112,8 @@ function CategoryProductsScreen({
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setCurrentTime(new Date());
     await refetch();
     setRefreshing(false);
-  };
-
-  const showClosedToast = () => {
-    Toast.show({
-      type: 'info',
-      text1: t('home.storeClosed'),
-      text2: t('home.storeClosedDesc', {
-        start:
-          workingTime?.working_time_start_formatted ||
-          workingTime?.working_time_start ||
-          '07:00 AM',
-        end:
-          workingTime?.working_time_end_formatted ||
-          workingTime?.working_time_end ||
-          '10:00 PM',
-      }),
-    });
   };
 
   const handleWishlistToggle = async (productId: number) => {
@@ -163,15 +145,9 @@ function CategoryProductsScreen({
   };
 
   const handleAddToCart = async (product: Product) => {
-    if (!isOpen) {
-      showClosedToast();
-      return;
-    }
-
     if (
       product.status === 0 ||
-      product.product_status === 0 ||
-      (typeof product.stock === 'number' && product.stock <= 0)
+      product.product_status === 0
     ) {
       return;
     }
@@ -193,10 +169,13 @@ function CategoryProductsScreen({
         quantity: '1',
         preorderDate: today,
       });
+      const prodName = isArabic
+        ? product.name_ar || product.name_en
+        : product.name_en || product.name_ar;
       Toast.show({
         type: 'success',
         text1: 'Added to Cart',
-        text2: `${product.name_en}`,
+        text2: `${prodName}`,
       });
     } catch (err: any) {
       Toast.show({
@@ -211,10 +190,8 @@ function CategoryProductsScreen({
     const imageUrl = `${BASE_URL}${item.image}`;
     const isInWishlist = wishlistProductIds.has(item.id);
     const isOutOrInactive =
-      item.status === 0 ||
-      item.product_status === 0 ||
-      (typeof item.stock === 'number' && item.stock <= 0);
-    const disabled = !isOpen || isOutOrInactive;
+      item.status === 0 || item.product_status === 0;
+    const disabled = isOutOrInactive;
 
     const hasOffer =
       item.offer != null &&
@@ -225,17 +202,7 @@ function CategoryProductsScreen({
       offerPrice && parseFloat(offerPrice) < parseFloat(item.price);
 
     const getDisabledLabel = () => {
-      if (!isOpen) {
-        return workingTime?.working_time_start_formatted
-          ? t('home.opensAt', {
-              time: workingTime.working_time_start_formatted,
-            })
-          : t('home.closedNotice');
-      }
-      if (typeof item.stock === 'number' && item.stock <= 0) {
-        return 'Out of Stock';
-      }
-      return 'Unavailable';
+      return t('common.unavailable');
     };
 
     return (
@@ -244,10 +211,6 @@ function CategoryProductsScreen({
         activeOpacity={disabled ? 0.95 : 0.8}
         disabled={isOutOrInactive}
         onPress={() => {
-          if (!isOpen) {
-            showClosedToast();
-            return;
-          }
           if (isOutOrInactive) {
             return;
           }
@@ -290,11 +253,13 @@ function CategoryProductsScreen({
             style={[styles.productName, disabled && styles.productNameDisabled]}
             numberOfLines={1}
           >
-            {isArabic ? item.name_ar || item.name_en : item.name_en}
+            {isArabic ? item.name_ar || item.name_en : item.name_en || item.name_ar}
           </Text>
 
           <Text style={styles.productCategory}>
-            {item.department?.name_en || 'Category'}
+            {isArabic
+              ? item.department?.name_ar || item.department?.name_en || ''
+              : item.department?.name_en || item.department?.name_ar || 'Category'}
           </Text>
 
           {(item.preparation_time_formatted ||
@@ -344,17 +309,19 @@ function CategoryProductsScreen({
               disabled={disabled}
               activeOpacity={disabled ? 1 : 0.8}
               onPress={() => {
-                if (!isOpen) {
-                  showClosedToast();
-                  return;
-                }
                 if (isOutOrInactive) {
                   return;
                 }
-                handleAddToCart(item);
+                if (isInCart(item.id)) {
+                  onShowCart?.();
+                } else {
+                  handleAddToCart(item);
+                }
               }}
             >
-              <Text style={styles.addButtonText}>{t('home.orderNow')}</Text>
+              <Text style={styles.addButtonText}>
+                {isInCart(item.id) ? t('home.viewInCart') : t('home.orderNow')}
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -426,30 +393,6 @@ function CategoryProductsScreen({
         numColumns={2}
         contentContainerStyle={styles.listContent}
         columnWrapperStyle={styles.columnWrapper}
-        ListHeaderComponent={
-          !isOpen ? (
-            <View style={styles.closedBanner}>
-              <View style={styles.closedBannerContent}>
-                <View style={styles.closedBadgePill}>
-                  <View style={styles.closedDot} />
-                  <Text style={styles.closedPillText}>{t('home.storeClosed')}</Text>
-                </View>
-                <Text style={styles.closedBannerTitle}>
-                  {t('home.storeClosedDesc', {
-                    start:
-                      workingTime?.working_time_start_formatted ||
-                      workingTime?.working_time_start ||
-                      '07:00 AM',
-                    end:
-                      workingTime?.working_time_end_formatted ||
-                      workingTime?.working_time_end ||
-                      '10:00 PM',
-                  })}
-                </Text>
-              </View>
-            </View>
-          ) : null
-        }
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

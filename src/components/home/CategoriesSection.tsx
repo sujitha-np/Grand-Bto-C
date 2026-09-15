@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   Image,
   ScrollView,
@@ -12,6 +12,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Department } from '../../services/api/department';
 import { BASE_URL } from '../../constants/api';
+import { prefetchDepartmentsImages } from '../../utils/imagePrefetch';
 
 interface CategoriesSectionProps {
   departments: Department[];
@@ -39,6 +40,12 @@ function CategoriesSection({
   const colors = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  useEffect(() => {
+    if (departments && departments.length > 0) {
+      prefetchDepartmentsImages(departments);
+    }
+  }, [departments]);
 
   const scrollToItem = (index: number) => {
     const itemWidth = sw(82);
@@ -96,9 +103,13 @@ function CategoriesSection({
                   ]}
                 >
                   <Image
-                    source={{ uri: `${BASE_URL}${dept.image}` }}
+                    source={{
+                      uri: `${BASE_URL}${dept.image}`,
+                      cache: 'force-cache',
+                    }}
                     style={styles.categoryImageImg}
                     resizeMode="cover"
+                    fadeDuration={0}
                   />
                 </View>
                 <Text

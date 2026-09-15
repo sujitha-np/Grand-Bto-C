@@ -13,11 +13,12 @@ import {
   SafeAreaProvider,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
 import { useTranslation } from 'react-i18next';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import './src/i18n';
+import i18n, { Language, LANGUAGE_STORAGE_KEY } from './src/i18n';
+import { setLanguage } from './src/store/languageSlice';
 import SplashScreen from './src/screens/SplashScreen';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
@@ -48,6 +49,9 @@ import PromoCodesScreen from './src/screens/PromoCodesScreen';
 import { SavedAddress } from './src/services/api/address';
 import { Product } from './src/services/api/product';
 import { cartService } from './src/services/api/cart';
+import { categoryService } from './src/services/api/category';
+import { offerService } from './src/services/api/offer';
+import { departmentService } from './src/services/api/department';
 import { useTheme } from './src/hooks/useTheme';
 import { useAddToCart, useProducts } from './src/hooks/queries';
 import { fs, sw, sh } from './src/utils/responsive';
@@ -165,11 +169,24 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    const currentLanguage = store.getState().language.current;
-    const isRTL = currentLanguage === 'ar';
-    I18nManager.forceRTL(isRTL);
+    const initLanguageAndAuth = async () => {
+      try {
+        const storedLang = (await AsyncStorage.getItem(
+          LANGUAGE_STORAGE_KEY,
+        )) as Language | null;
+        if (storedLang === 'ar' || storedLang === 'en') {
+          const isRTL = storedLang === 'ar';
+          I18nManager.allowRTL(true);
+          I18nManager.forceRTL(isRTL);
+          i18n.changeLanguage(storedLang);
+          store.dispatch(setLanguage(storedLang));
+        } else {
+          I18nManager.allowRTL(true);
+        }
+      } catch (e) {
+        // ignore
+      }
 
-    const checkAuthStatus = async () => {
       try {
         const storedId = await AsyncStorage.getItem('customerId');
         if (storedId) {
@@ -180,7 +197,24 @@ function AppContent() {
         // ignore storage errors
       }
     };
-    checkAuthStatus();
+    initLanguageAndAuth();
+
+    // Pre-hydrate cache & prefetch banner images early
+    categoryService.getCachedCategories().then(cached => {
+      if (cached?.data?.length && !queryClient.getQueryData(['categories'])) {
+        queryClient.setQueryData(['categories'], cached);
+      }
+    });
+    offerService.getCachedOffers().then(cached => {
+      if (cached?.data?.length && !queryClient.getQueryData(['offers'])) {
+        queryClient.setQueryData(['offers'], cached);
+      }
+    });
+    departmentService.getCachedDepartments().then(cached => {
+      if (cached?.data?.length && !queryClient.getQueryData(['departments'])) {
+        queryClient.setQueryData(['departments'], cached);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -423,6 +457,7 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
           setSelectedProduct(product);
           setSubScreen('productDetail');
         }}
+        onShowCart={() => setSubScreen('cart')}
       />
     );
   }
@@ -440,6 +475,7 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
           setSelectedProduct(product);
           setSubScreen('productDetail');
         }}
+        onShowCart={() => setSubScreen('cart')}
       />
     );
   }
@@ -500,6 +536,10 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
           setSelectedProduct(null);
           setSubScreen(null);
         }}
+        onShowCart={() => {
+          setSelectedProduct(null);
+          setSubScreen('cart');
+        }}
         onAddToCart={async (productId: number, quantity: number) => {
           if (customerId) {
             const today = new Date().toISOString().split('T')[0];
@@ -515,8 +555,6 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
                 text1: 'Added to Cart',
                 text2: `${quantity}x ${selectedProduct.name_en}`,
               });
-              setSelectedProduct(null);
-              setSubScreen(null);
             } catch (err: any) {
               Toast.show({
                 type: 'error',
@@ -635,6 +673,7 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
       <View style={{ flex: 1 }}>
         {activeTab === 'home' && (
           <HomeScreen
+            customerId={customerId ? String(customerId) : undefined}
             onShowCart={() => setSubScreen('cart')}
             onShowProductDetail={product => {
               setSelectedProduct(product);

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useTheme } from '../hooks/useTheme';
 import { useWishlist, useRemoveFromWishlist } from '../hooks/queries';
 import { fs, sw, sh } from '../utils/responsive';
@@ -33,10 +34,12 @@ interface WishlistScreenProps {
 }
 
 function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const [customerId, setCustomerId] = useState<string | undefined>();
-    const insets = useSafeAreaInsets();
+  const insets = useSafeAreaInsets();
 
   const { data: wishlistData, isLoading, error } = useWishlist(customerId);
   const { mutateAsync: removeFromWishlist } = useRemoveFromWishlist();
@@ -79,11 +82,13 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
         />
         <View style={styles.itemInfo}>
           <Text style={styles.itemName} numberOfLines={2}>
-            {item.product_name}
+            {isArabic
+              ? item.product_name_ar || item.product_name
+              : item.product_name || item.product_name_ar}
           </Text>
           <Text style={styles.itemPrice}>{parseFloat(item.price).toFixed(2)} QAR</Text>
           <Text style={styles.itemDate}>
-            Added: {new Date(item.added_at).toLocaleDateString()}
+            {t('wishlist.added')}: {new Date(item.added_at).toLocaleDateString()}
           </Text>
         </View>
         <TouchableOpacity
@@ -104,7 +109,7 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title="My Wishlist" onBack={onBack} />
+        <Header title={t('wishlist.title')} onBack={onBack} />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -115,9 +120,9 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
   if (error) {
     return (
       <SafeAreaView style={styles.container}>
-        <Header title="My Wishlist" onBack={onBack}     />
+        <Header title={t('wishlist.title')} onBack={onBack} />
         <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>Failed to load wishlist</Text>
+          <Text style={styles.errorText}>{t('wishlist.errorText')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -125,13 +130,15 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Header title="My Wishlist" onBack={onBack} 
-      containerStyle={{
-                  backgroundColor: colors.background,
-                  paddingBottom: sh(16),
-                  paddingTop: insets.top + sh(12),
-                }}
-                />
+      <Header
+        title={t('wishlist.title')}
+        onBack={onBack}
+        containerStyle={{
+          backgroundColor: colors.background,
+          paddingBottom: sh(16),
+          paddingTop: insets.top + sh(12),
+        }}
+      />
 
       <FlatList
         data={wishlistItems}
@@ -145,9 +152,9 @@ function WishlistScreen({ onBack, onShowProductDetail }: WishlistScreenProps) {
               style={styles.emptyIcon}
               resizeMode="contain"
             />
-            <Text style={styles.emptyTitle}>Your wishlist is empty</Text>
+            <Text style={styles.emptyTitle}>{t('wishlist.emptyTitle')}</Text>
             <Text style={styles.emptyText}>
-              Add products you love to your wishlist
+              {t('wishlist.emptyText')}
             </Text>
           </View>
         }

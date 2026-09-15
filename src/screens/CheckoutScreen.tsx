@@ -20,6 +20,7 @@ import Header from '../components/common/Header';
 import CouponSection from '../components/cart/CouponSection';
 import { SavedAddress } from '../services/api/address';
 import { orderService } from '../services/api/order';
+import { cartService } from '../services/api/cart';
 import { useQueryClient } from '@tanstack/react-query';
 import Toast from 'react-native-toast-message';
 import { WebView } from 'react-native-webview';
@@ -118,17 +119,13 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     const loadSpecialRequest = async () => {
       try {
         const persisted = await AsyncStorage.getItem(`special_request_${cartId}`);
-        if (persisted !== null) {
-          setSpecialRequest(persisted);
-        } else if (checkoutData?.special_request) {
-          setSpecialRequest(checkoutData.special_request);
-        }
+        setSpecialRequest(persisted !== null ? persisted : '');
       } catch (e) {
         console.error('Failed to load persisted special request in checkout', e);
       }
     };
     loadSpecialRequest();
-  }, [cartId, checkoutData?.special_request]);
+  }, [cartId]);
 
   // Listen to AppState changes to auto-verify payment status when returning to app
   useEffect(() => {
@@ -150,6 +147,26 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
     };
   }, [createdOrderId, createdOrderUniqueId]);
 
+
+  const clearSpecialRequestData = async () => {
+    try {
+      if (customerId && cartId) {
+        cartService.specialRequest(cartId, customerId, '', null).catch((e: any) => {
+          console.log('[CheckoutScreen] clearSpecialRequest error on backend:', e);
+        });
+      }
+      const allKeys = await AsyncStorage.getAllKeys();
+      const specialReqKeys = allKeys.filter(
+        k => k.startsWith('special_request_') || k.startsWith('special_request'),
+      );
+      if (specialReqKeys.length > 0) {
+        await AsyncStorage.multiRemove(specialReqKeys);
+      }
+      queryClient.setQueryData(['cart', customerId], null);
+    } catch (err) {
+      console.error('Failed to clear special request data:', err);
+    }
+  };
 
   // Helper: Evaluate isPaid
   const evaluateIsPaid = (order: any): boolean => {
@@ -204,9 +221,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
         queryClient.invalidateQueries({ queryKey: ['cart'] });
         queryClient.invalidateQueries({ queryKey: ['orders'] });
         
-        AsyncStorage.removeItem(`special_request_${cartId}`).catch(err => {
-          console.error('Failed to remove special request', err);
-        });
+        clearSpecialRequestData();
 
         setCreatedOrderId(null);
         setCreatedOrderUniqueId(null);
@@ -276,9 +291,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
             queryClient.invalidateQueries({ queryKey: ['cart'] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             
-            AsyncStorage.removeItem(`special_request_${cartId}`).catch(err => {
-              console.error('Failed to remove special request', err);
-            });
+            clearSpecialRequestData();
 
             Toast.show({
               type: 'success',
@@ -351,9 +364,7 @@ const CheckoutScreen: React.FC<CheckoutScreenProps> = ({
       queryClient.invalidateQueries({ queryKey: ['cart'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
 
-      AsyncStorage.removeItem(`special_request_${cartId}`).catch(err => {
-        console.error('Failed to remove special request', err);
-      });
+      clearSpecialRequestData();
 
       const displayId = uniqueId || (orderId && orderId === createdOrderId ? createdOrderUniqueId : null) || (orderId ? String(orderId) : null) || createdOrderUniqueId || 'success';
       

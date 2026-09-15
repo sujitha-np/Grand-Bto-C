@@ -1,4 +1,8 @@
 {
+  "common": {
+    "outOfStock": "نفدت الكمية",
+    "unavailable": "غير متوفر"
+  },
   "splash": {
     "getStarted": "ابدأ الآن"
   },
@@ -21,7 +25,11 @@
     "notifications": "الإشعارات",
     "darkTheme": "الوضع الداكن",
     "country": "الدولة",
-    "countryValue": "قطر"
+    "countryValue": "قطر",
+    "changeLanguageTitle": "تغيير اللغة",
+    "changeLanguageConfirm": "هل أنت متأكد من تغيير اللغة إلى {{language}}؟",
+    "cancel": "إلغاء",
+    "change": "تغيير"
   },
   "register": {
     "title": "إنشاء حساب",
@@ -91,6 +99,7 @@
     "pizza": "البيتزا",
     "fastFood": "الوجبات السريعة",
     "orderNow": "اطلب الآن",
+    "viewInCart": "عرض في السلة",
     "homeTab": "الرئيسية",
     "ordersTab": "الطلبات",
     "accountTab": "الحساب",
@@ -225,5 +234,28 @@
     "pointHistory": "سجل النقاط",
     "seeAll": "عرض الكل",
     "noHistory": "لا يوجد سجل نقاط متاح"
+  },
+  "wishlist": {
+    "title": "قائمة أمنياتي",
+    "added": "تمت الإضافة",
+    "emptyTitle": "قائمة أمنياتك فارغة",
+    "emptyText": "أضف المنتجات التي تحبها إلى قائمة أمنياتك",
+    "errorText": "فشل تحميل قائمة الأمنيات"
+  },
+  "orders": {
+    "title": "الطلبات",
+    "order": "طلب",
+    "showLess": "عرض أقل",
+    "moreItems": "+ {{count}} عناصر أخرى",
+    "cancelOrder": "إلغاء الطلب",
+    "cancelConfirmTitle": "إلغاء الطلب",
+    "cancelConfirmMessage": "هل أنت متأكد أنك تريد إلغاء هذا الطلب؟",
+    "no": "لا",
+    "yesCancel": "نعم، إلغاء",
+    "totalAmount": "المبلغ الإجمالي",
+    "qty": "الكمية",
+    "noOrders": "لا توجد طلبات لهذا التاريخ",
+    "orderedOn": "تم الطلب في",
+    "delivery": "التسليم"
   }
 }

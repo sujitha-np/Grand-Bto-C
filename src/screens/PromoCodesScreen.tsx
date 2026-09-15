@@ -11,6 +11,7 @@ import {
   Image,
 } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
+import { useTranslation } from 'react-i18next';
 import { usePromocodes } from '../hooks/queries';
 import { fs, sw, sh } from '../utils/responsive';
 import { Promocode } from '../services/api/promocode';
@@ -26,6 +27,8 @@ export default function PromoCodesScreen({
   onBack,
   onSelectPromo,
 }: PromoCodesScreenProps) {
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const styles = React.useMemo(() => createStyles(colors), [colors]);
 
@@ -75,7 +78,9 @@ export default function PromoCodesScreen({
         </ImageBackground>
 
         <View style={styles.couponContent}>
-          <Text style={styles.couponTitle}>{item.name_en}</Text>
+          <Text style={styles.couponTitle}>
+            {isArabic ? item.name_ar || item.name_en : item.name_en || item.name_ar}
+          </Text>
           <Text style={styles.promoCode}>{item.promo_code}</Text>
 
           {item.min_product_price ? (

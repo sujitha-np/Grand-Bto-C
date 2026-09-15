@@ -29,10 +29,9 @@ import {
   useSearchProducts,
   useCategories,
   useOffers,
-  useWorkingTime,
   useNotifications,
+  useCart,
 } from '../hooks/queries';
-import { isStoreOpen } from '../utils/workingTime';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Toast from 'react-native-toast-message';
 import { useQueryClient } from '@tanstack/react-query';
@@ -43,6 +42,7 @@ import ProductsSection from '../components/home/ProductsSection';
 import CategoriesCarousel from '../components/home/CategoriesCarousel';
 
 interface HomeScreenProps {
+  customerId?: string | number;
   onSearch?: () => void;
   onShowCart?: () => void;
   onShowProductDetail?: (product: Product) => void;
@@ -53,6 +53,7 @@ interface HomeScreenProps {
 }
 
 function HomeScreen({
+  customerId: propCustomerId,
   onSearch,
   onShowCart,
   onShowProductDetail,
@@ -62,7 +63,8 @@ function HomeScreen({
   onShowNotification,
 }: HomeScreenProps) {
   const insets = useSafeAreaInsets();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
   const colors = useTheme();
   const queryClient = useQueryClient();
   const [searchText, setSearchText] = useState('');
@@ -70,9 +72,10 @@ function HomeScreen({
     number | undefined
   >(undefined);
   const [refreshing, setRefreshing] = useState(false);
-  const [customerId, setCustomerId] = useState<string | undefined>();
+  const [customerId, setCustomerId] = useState<string | undefined>(
+    propCustomerId ? String(propCustomerId) : undefined,
+  );
   const [showAddressModal, setShowAddressModal] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [readNotificationIds, setReadNotificationIds] = useState<number[]>([]);
   const { mutateAsync: addToCart } = useAddToCart();
 
@@ -88,43 +91,23 @@ function HomeScreen({
     : 'Home';
 
   useEffect(() => {
-    const loadCustomerId = async () => {
-      try {
-        const storedCustomerId = await AsyncStorage.getItem('customerId');
-        if (storedCustomerId) {
-          setCustomerId(storedCustomerId);
+    if (propCustomerId) {
+      setCustomerId(String(propCustomerId));
+    } else if (!customerId) {
+      const loadCustomerId = async () => {
+        try {
+          const storedCustomerId = await AsyncStorage.getItem('customerId');
+          if (storedCustomerId) {
+            setCustomerId(storedCustomerId);
+          }
+        } catch (error) {
+          console.error('Error loading customerId:', error);
         }
-      } catch (error) {
-        console.error('Error loading customerId:', error);
-      }
-    };
+      };
 
-    loadCustomerId();
-  }, []);
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 30000);
-    return () => clearInterval(timer);
-  }, []);
-
-  const {
-    data: workingTimeData,
-    refetch: refetchWorkingTime,
-  } = useWorkingTime();
-  const workingTime = workingTimeData?.success ? workingTimeData : null;
-
-  const isOpen = React.useMemo(() => {
-    if (!workingTime?.working_time_start || !workingTime?.working_time_end) {
-      return true;
+      loadCustomerId();
     }
-    return isStoreOpen(
-      workingTime.working_time_start,
-      workingTime.working_time_end,
-      currentTime,
-    );
-  }, [workingTime, currentTime]);
+  }, [propCustomerId, customerId]);
 
   const {
     data: departmentsData,
@@ -147,6 +130,31 @@ function HomeScreen({
     refetch: refetchNotifications,
   } = useNotifications(customerId);
 
+  const today = new Date().toISOString().split('T')[0];
+  const { data: cartResponse, refetch: refetchCart } = useCart(
+    customerId,
+    today,
+  );
+
+  const cartProductCount = React.useMemo(() => {
+    if (!cartResponse) return 0;
+    const directCount =
+      (cartResponse?.data as any)?.total_product_count ??
+      (cartResponse?.data as any)?.cart?.total_product_count ??
+      (cartResponse as any)?.total_product_count;
+    if (directCount !== undefined && directCount !== null && directCount !== '') {
+      return Number(directCount);
+    }
+    const cartItems = (cartResponse?.data as any)?.cart?.items;
+    if (Array.isArray(cartItems)) {
+      return cartItems.reduce(
+        (acc: number, item: any) => acc + (parseInt(item.quantity, 10) || 1),
+        0,
+      );
+    }
+    return 0;
+  }, [cartResponse]);
+
   const departments = departmentsData?.data || [];
   const categories = categoriesData?.data || [];
   const offers = offersData?.data || [];
@@ -160,11 +168,12 @@ function HomeScreen({
     loadReadIds();
   }, [notificationsData]);
 
-  const unreadNotificationCount = allNotifications.length > 0
-    ? allNotifications.filter(
-        n => !n.is_read && !readNotificationIds.includes(n.id),
-      ).length
-    : (notificationsData?.data?.unread_count || 0);
+  const unreadNotificationCount =
+    allNotifications.length > 0
+      ? allNotifications.filter(
+          n => !n.is_read && !readNotificationIds.map(Number).includes(Number(n.id)),
+        ).length
+      : notificationsData?.data?.unread_count || 0;
 
   // Determine which products to show based on search state
   const products =
@@ -181,15 +190,21 @@ function HomeScreen({
 
   const handlePromoPress = (offer: any, index: number) => {
     console.log('Promo pressed:', offer, index);
-    if (onShowOfferedProducts && offer.id && offer.name_en) {
-      onShowOfferedProducts(offer.id, offer.name_en);
+    const offerName = isArabic
+      ? offer.name_ar || offer.name_en
+      : offer.name_en || offer.name_ar;
+    if (onShowOfferedProducts && offer.id && offerName) {
+      onShowOfferedProducts(offer.id, offerName);
     }
   };
 
   const handleCategoryBannerPress = (category: Category) => {
     console.log('Category banner pressed:', category);
-    if (onShowCategoryProducts && category.id) {
-      onShowCategoryProducts(category.id, category.name_en);
+    const categoryName = isArabic
+      ? category.name_ar || category.name_en
+      : category.name_en || category.name_ar;
+    if (onShowCategoryProducts && category.id && categoryName) {
+      onShowCategoryProducts(category.id, categoryName);
     }
   };
 
@@ -210,24 +225,25 @@ function HomeScreen({
       const ids = allNotifications.map(n => n.id);
       const updated = await markNotificationsAsRead(ids);
       setReadNotificationIds(updated);
-
-      if (customerId) {
-        queryClient.setQueryData(['notifications', customerId], (prev: any) => {
-          if (!prev?.data) return prev;
-          return {
-            ...prev,
-            data: {
-              ...prev.data,
-              unread_count: 0,
-              notifications: prev.data.notifications.map((n: any) => ({
-                ...n,
-                is_read: true,
-              })),
-            },
-          };
-        });
-      }
     }
+
+    if (customerId) {
+      queryClient.setQueryData(['notifications', customerId], (prev: any) => {
+        if (!prev?.data) return prev;
+        return {
+          ...prev,
+          data: {
+            ...prev.data,
+            unread_count: 0,
+            notifications: (prev.data.notifications || []).map((n: any) => ({
+              ...n,
+              is_read: true,
+            })),
+          },
+        };
+      });
+    }
+
     onShowNotification?.();
   };
 
@@ -240,14 +256,13 @@ function HomeScreen({
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setCurrentTime(new Date());
     await Promise.all([
-      refetchWorkingTime(),
       refetchDepartments(),
       refetchCategories(),
       refetchOffers(),
       refetchProducts(),
       refetchNotifications(),
+      refetchCart(),
       selectedDepartmentId ? refetchDeptProducts() : Promise.resolve(),
       searchText.trim().length >= 2 ? refetchSearchProducts() : Promise.resolve(),
     ]);
@@ -324,6 +339,15 @@ function HomeScreen({
                   style={styles.headerIcon}
                   resizeMode="contain"
                 />
+                {unreadNotificationCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {unreadNotificationCount > 99
+                        ? '99+'
+                        : unreadNotificationCount}
+                    </Text>
+                  </View>
+                ) : null}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.iconBtn}
@@ -335,6 +359,13 @@ function HomeScreen({
                   style={styles.headerIcon}
                   resizeMode="contain"
                 />
+                {cartProductCount > 0 ? (
+                  <View style={styles.notificationBadge}>
+                    <Text style={styles.notificationBadgeText}>
+                      {cartProductCount > 99 ? '99+' : cartProductCount}
+                    </Text>
+                  </View>
+                ) : null}
               </TouchableOpacity>
             </View>
           </View>
@@ -414,27 +445,9 @@ function HomeScreen({
         >
           <ProductsSection
             products={products}
-            isOpen={isOpen}
-            workingTime={workingTime}
             onProductPress={handleProductPress}
+            onShowCart={onShowCart}
             onAddPress={async product => {
-              if (!isOpen) {
-                Toast.show({
-                  type: 'info',
-                  text1: t('home.storeClosed'),
-                  text2: t('home.storeClosedDesc', {
-                    start:
-                      workingTime?.working_time_start_formatted ||
-                      workingTime?.working_time_start ||
-                      '07:00 AM',
-                    end:
-                      workingTime?.working_time_end_formatted ||
-                      workingTime?.working_time_end ||
-                      '10:00 PM',
-                  }),
-                });
-                return;
-              }
               const customerId = await AsyncStorage.getItem('customerId');
               const token = await AsyncStorage.getItem('userToken');
               console.log('Customer ID:', customerId);
@@ -599,6 +612,7 @@ const createStyles = (colors: any, insets: any) =>
       paddingHorizontal: sw(4),
       borderWidth: 1.5,
       borderColor: '#FFFFFF',
+      zIndex: 1,
     },
     notificationBadgeText: {
       color: '#FFFFFF',

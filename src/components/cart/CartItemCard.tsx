@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { fs, sw, sh } from '../../utils/responsive';
 import { Images } from '../../assets/images';
 import { BASE_URL } from '../../constants/api';
@@ -20,6 +21,9 @@ export default function CartItemCard({
   onDecrease,
   onDelete,
 }: CartItemCardProps) {
+  const { i18n } = useTranslation();
+  const isArabic = i18n.language?.startsWith('ar');
+
   return (
     <View style={[styles.container, { borderBottomColor: colors.borderSubtle }]}>
       <Image
@@ -31,10 +35,14 @@ export default function CartItemCard({
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
             <Text style={[styles.title, { color: colors.darkBrown, fontFamily: colors.fontInterMedium }]} numberOfLines={1}>
-              {item.product_name}
+              {isArabic
+                ? item.product_name_ar || item.product_name
+                : item.product_name || item.product_name_ar}
             </Text>
             <Text style={[styles.category, { color: colors.text, fontFamily: colors.fontInterRegular ,opacity:0.5}]}>
-              {item.department?.name_en}
+              {isArabic
+                ? item.department?.name_ar || item.department?.name_en
+                : item.department?.name_en || item.department?.name_ar}
             </Text>
           </View>
           <TouchableOpacity onPress={onDelete} style={styles.deleteButton}>
