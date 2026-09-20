@@ -901,6 +901,15 @@ export const usePreorderLimit = () => {
   });
 };
 
+export const useWorkingTime = () => {
+  return useQuery({
+    queryKey: ['workingTime'],
+    queryFn: () => settingsService.getWorkingTime(),
+    staleTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+
 export const useCheckoutDetails = (
   customerId?: string,
   cartId?: string,

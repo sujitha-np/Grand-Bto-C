@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../hooks/useTheme';
 import { fs, sw, sh } from '../utils/responsive';
 import Header from '../components/common/Header';
-import { useCartCheckout, usePreorderLimit } from '../hooks/queries';
+import { useCartCheckout, usePreorderLimit, useWorkingTime } from '../hooks/queries';
 import { NonDeliverableProduct } from '../services/api/checkout';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -26,19 +26,43 @@ interface CalendarScreenProps {
 
 const DAYS_OF_WEEK = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
-const HOURS = Array.from({ length: 15 }, (_, i) => {
-  const h = i + 8; // 8 AM to 10 PM
-  const suffix = h < 12 ? 'AM' : 'PM';
-  const display = h <= 12 ? h : h - 12;
-  return { label: `${display}:00 ${suffix}`, value: h };
-});
+const parseTimeString = (
+  timeStr?: string,
+  defaultHour: number = 7,
+  defaultMinute: number = 0,
+) => {
+  if (!timeStr) return { hour: defaultHour, minute: defaultMinute };
+  const parts = timeStr.split(':').map(p => parseInt(p, 10));
+  const hour = !isNaN(parts[0]) ? parts[0] : defaultHour;
+  const minute = parts.length > 1 && !isNaN(parts[1]) ? parts[1] : defaultMinute;
+  return { hour, minute };
+};
 
-const MINUTES = [
-  { label: ':00', value: 0 },
-  { label: ':15', value: 15 },
-  { label: ':30', value: 30 },
-  { label: ':45', value: 45 },
-];
+const getValidMinutesForHour = (
+  hour: number,
+  isToday: boolean,
+  curHour: number,
+  curMin: number,
+  startHour: number,
+  startMinute: number,
+  endHour: number,
+  endMinute: number,
+) => {
+  let minutes = [0, 15, 30, 45];
+  if (hour === startHour) {
+    minutes = minutes.filter(m => m >= startMinute);
+  }
+  if (hour === endHour) {
+    minutes = minutes.filter(m => m <= endMinute);
+  }
+  if (isToday && hour === curHour) {
+    minutes = minutes.filter(m => m > curMin);
+  }
+  return minutes.map(m => ({
+    label: `:${String(m).padStart(2, '0')}`,
+    value: m,
+  }));
+};
 
 const CalendarScreen: React.FC<CalendarScreenProps> = ({
   onBack,
@@ -51,6 +75,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { mutate: validateCheckout, isPending: validating } = useCartCheckout();
   const { data: preorderLimitData, isLoading: loadingLimit } = usePreorderLimit();
+  const { data: workingTimeData, isLoading: loadingWorkingTime } = useWorkingTime();
   const [customerId, setCustomerId] = useState<string | null>(propCustomerId || null);
 
   useEffect(() => {
@@ -117,35 +142,133 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
     );
   }, [selectedDate]);
 
+  const workingHoursDisplay = useMemo(() => {
+    if (
+      workingTimeData?.working_time_start_formatted &&
+      workingTimeData?.working_time_end_formatted
+    ) {
+      return `${workingTimeData.working_time_start_formatted} - ${workingTimeData.working_time_end_formatted}`;
+    }
+    return '';
+  }, [workingTimeData]);
+
+  const baseHours = useMemo(() => {
+    const { hour: startHour, minute: startMinute } = parseTimeString(
+      workingTimeData?.working_time_start,
+      7,
+      0,
+    );
+    const { hour: endHour, minute: endMinute } = parseTimeString(
+      workingTimeData?.working_time_end,
+      22,
+      0,
+    );
+
+    const hours = [];
+    for (let h = startHour; h <= endHour; h++) {
+      const validMins = getValidMinutesForHour(
+        h,
+        false,
+        0,
+        0,
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+      );
+      if (validMins.length > 0) {
+        const suffix = h < 12 ? 'AM' : 'PM';
+        const display = h === 0 ? 12 : h <= 12 ? h : h - 12;
+        hours.push({ label: `${display}:00 ${suffix}`, value: h });
+      }
+    }
+    return hours;
+  }, [workingTimeData]);
+
   const availableHours = useMemo(() => {
-    if (!isSelectedDateToday) return HOURS;
+    const { hour: startHour, minute: startMinute } = parseTimeString(
+      workingTimeData?.working_time_start,
+      7,
+      0,
+    );
+    const { hour: endHour, minute: endMinute } = parseTimeString(
+      workingTimeData?.working_time_end,
+      22,
+      0,
+    );
+
+    if (!isSelectedDateToday) {
+      return baseHours;
+    }
+
     const now = getQatarDate();
     const curHour = now.getHours();
     const curMin = now.getMinutes();
 
-    return HOURS.filter(h => {
-      if (h.value > curHour) return true;
-      if (h.value === curHour) {
-        return curMin < 45;
-      }
-      return false;
+    return baseHours.filter(h => {
+      if (h.value < curHour) return false;
+      const validMins = getValidMinutesForHour(
+        h.value,
+        true,
+        curHour,
+        curMin,
+        startHour,
+        startMinute,
+        endHour,
+        endMinute,
+      );
+      return validMins.length > 0;
     });
-  }, [isSelectedDateToday]);
+  }, [baseHours, isSelectedDateToday, workingTimeData]);
 
   const availableMinutes = useMemo(() => {
     if (selectedHour === null) return [];
-    if (!isSelectedDateToday) return MINUTES;
+    const { hour: startHour, minute: startMinute } = parseTimeString(
+      workingTimeData?.working_time_start,
+      7,
+      0,
+    );
+    const { hour: endHour, minute: endMinute } = parseTimeString(
+      workingTimeData?.working_time_end,
+      22,
+      0,
+    );
 
     const now = getQatarDate();
     const curHour = now.getHours();
     const curMin = now.getMinutes();
 
-    if (selectedHour === curHour) {
-      return MINUTES.filter(m => m.value > curMin);
-    }
+    return getValidMinutesForHour(
+      selectedHour,
+      isSelectedDateToday,
+      curHour,
+      curMin,
+      startHour,
+      startMinute,
+      endHour,
+      endMinute,
+    );
+  }, [selectedHour, isSelectedDateToday, workingTimeData]);
 
-    return MINUTES;
-  }, [selectedHour, isSelectedDateToday]);
+  useEffect(() => {
+    if (selectedHour !== null) {
+      const exists = availableHours.some(h => h.value === selectedHour);
+      if (!exists) {
+        setSelectedHour(null);
+        setSelectedMinute(null);
+      }
+    }
+  }, [availableHours, selectedHour]);
+
+  useEffect(() => {
+    if (selectedMinute !== null && selectedHour !== null) {
+      const exists = availableMinutes.some(m => m.value === selectedMinute);
+      if (!exists) {
+        setSelectedMinute(null);
+      }
+    }
+  }, [availableMinutes, selectedMinute, selectedHour]);
+
 
   const monthNames = [
     'January',
@@ -548,86 +671,68 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
         <View
           style={[styles.timePickerCard, { borderColor: colors.borderSubtle }]}
         >
-          <Text
-            style={[
-              styles.timePickerTitle,
-              { color: colors.darkBrown, fontFamily: colors.fontSemiBold },
-            ]}
-          >
-            Select Time
-          </Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: sh(12) }}>
+            <Text
+              style={[
+                styles.timePickerTitle,
+                { color: colors.darkBrown, fontFamily: colors.fontSemiBold, marginBottom: 0 },
+              ]}
+            >
+              Select Time
+            </Text>
+            {!!workingHoursDisplay && (
+              <Text
+                style={{
+                  fontSize: fs(12),
+                  color: colors.textMuted,
+                  fontFamily: colors.fontRegular,
+                }}
+              >
+                Working Hours: {workingHoursDisplay}
+              </Text>
+            )}
+          </View>
 
-          {/* Hour selector */}
-          <Text
-            style={[
-              styles.timeLabel,
-              { color: colors.textMuted, fontFamily: colors.fontRegular },
-            ]}
-          >
-            Hour
-          </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.timeRow}
-          >
-            {availableHours.map(h => {
-              const active = selectedHour === h.value;
-              return (
-                <TouchableOpacity
-                  key={h.value}
-                  style={[
-                    styles.timeChip,
-                    {
-                      borderColor: active
-                        ? colors.primary
-                        : colors.borderSubtle,
-                    },
-                    active && { backgroundColor: colors.primary },
-                  ]}
-                  onPress={() => setSelectedHour(h.value)}
-                >
-                  <Text
-                    style={[
-                      styles.timeChipText,
-                      {
-                        color: active ? '#FFFFFF' : colors.darkBrown,
-                        fontFamily: active
-                          ? colors.fontSemiBold
-                          : colors.fontRegular,
-                      },
-                    ]}
-                  >
-                    {h.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-
-          {/* Minute selector — only shown after hour selected */}
-          {selectedHour !== null && (
+          {loadingWorkingTime ? (
+            <View style={{ paddingVertical: sh(20), alignItems: 'center' }}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : availableHours.length === 0 ? (
+            <View style={{ paddingVertical: sh(16), alignItems: 'center' }}>
+              <Text
+                style={{
+                  color: colors.textMuted,
+                  fontSize: fs(13),
+                  fontFamily: colors.fontRegular,
+                  textAlign: 'center',
+                }}
+              >
+                No delivery time slots available for today. Please select a future date.
+              </Text>
+            </View>
+          ) : (
             <>
+              {/* Hour selector */}
               <Text
                 style={[
                   styles.timeLabel,
-                  {
-                    color: colors.textMuted,
-                    fontFamily: colors.fontRegular,
-                    marginTop: sh(12),
-                  },
+                  { color: colors.textMuted, fontFamily: colors.fontRegular },
                 ]}
               >
-                Minute
+                Hour
               </Text>
-              <View style={styles.minuteRow}>
-                {availableMinutes.map(m => {
-                  const active = selectedMinute === m.value;
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.timeRow}
+              >
+                {availableHours.map(h => {
+                  const active = selectedHour === h.value;
                   return (
                     <TouchableOpacity
-                      key={m.value}
+                      key={h.value}
                       style={[
-                        styles.minuteChip,
+                        styles.timeChip,
                         {
                           borderColor: active
                             ? colors.primary
@@ -635,7 +740,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
                         },
                         active && { backgroundColor: colors.primary },
                       ]}
-                      onPress={() => setSelectedMinute(m.value)}
+                      onPress={() => setSelectedHour(h.value)}
                     >
                       <Text
                         style={[
@@ -648,26 +753,78 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
                           },
                         ]}
                       >
-                        {m.label}
+                        {h.label}
                       </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-            </>
-          )}
+              </ScrollView>
 
-          {/* Selected time summary */}
-          {selectedHour !== null && selectedMinute !== null && (
-            <Text
-              style={[
-                styles.selectedTimeSummary,
-                { color: colors.primary, fontFamily: colors.fontSemiBold },
-              ]}
-            >
-              Selected: {formatShortDate(selectedDate)} at{' '}
-              {formatSelectedTime()}
-            </Text>
+              {/* Minute selector — only shown after hour selected */}
+              {selectedHour !== null && (
+                <>
+                  <Text
+                    style={[
+                      styles.timeLabel,
+                      {
+                        color: colors.textMuted,
+                        fontFamily: colors.fontRegular,
+                        marginTop: sh(12),
+                      },
+                    ]}
+                  >
+                    Minute
+                  </Text>
+                  <View style={styles.minuteRow}>
+                    {availableMinutes.map(m => {
+                      const active = selectedMinute === m.value;
+                      return (
+                        <TouchableOpacity
+                          key={m.value}
+                          style={[
+                            styles.minuteChip,
+                            {
+                              borderColor: active
+                                ? colors.primary
+                                : colors.borderSubtle,
+                            },
+                            active && { backgroundColor: colors.primary },
+                          ]}
+                          onPress={() => setSelectedMinute(m.value)}
+                        >
+                          <Text
+                            style={[
+                              styles.timeChipText,
+                              {
+                                color: active ? '#FFFFFF' : colors.darkBrown,
+                                fontFamily: active
+                                  ? colors.fontSemiBold
+                                  : colors.fontRegular,
+                              },
+                            ]}
+                          >
+                            {m.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
+
+              {/* Selected time summary */}
+              {selectedHour !== null && selectedMinute !== null && (
+                <Text
+                  style={[
+                    styles.selectedTimeSummary,
+                    { color: colors.primary, fontFamily: colors.fontSemiBold },
+                  ]}
+                >
+                  Selected: {formatShortDate(selectedDate)} at{' '}
+                  {formatSelectedTime()}
+                </Text>
+              )}
+            </>
           )}
         </View>
       )}
