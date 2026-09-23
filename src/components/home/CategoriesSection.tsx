@@ -48,7 +48,7 @@ function CategoriesSection({
   }, [departments]);
 
   const scrollToItem = (index: number) => {
-    const itemWidth = sw(82);
+    const itemWidth = sw(96);
     const screenWidth = sw(375);
     const scrollPosition = index * itemWidth - screenWidth / 2 + itemWidth / 2;
     scrollRef.current?.scrollTo({
@@ -64,11 +64,24 @@ function CategoriesSection({
   };
 
   const getDepartmentName = (dept: Department) => {
+    let name = '';
     if (dept.display_name && dept.display_name.trim() !== '') {
-      return dept.display_name;
+      name = dept.display_name;
+    } else {
+      const isArabic = i18n.language?.startsWith('ar');
+      name = isArabic ? (dept.name_ar || dept.name_en) : (dept.name_en || dept.name_ar);
     }
-    const isArabic = i18n.language?.startsWith('ar');
-    return isArabic ? (dept.name_ar || dept.name_en) : (dept.name_en || dept.name_ar);
+
+    if (!name) return '';
+
+    if (name.includes('\n')) return name;
+
+    // Format Salad & Sandwiches (or variations) so "Salad &" is on line 1 and "Sandwiches" is on line 2
+    if (/salad/i.test(name) && /sandwich/i.test(name)) {
+      return name.replace(/salads?\s*(?:&|and)?\s*/i, 'Salad &\n');
+    }
+
+    return name;
   };
 
   return (
@@ -151,12 +164,12 @@ const createStyles = (colors: any) =>
     },
     categoryRow: {
       flexDirection: 'row',
-      gap: sw(24),
+      gap: sw(20),
       marginRight: sw(20),
     },
     categoryCard: {
       alignItems: 'center',
-      width: sw(70),
+      width: sw(76),
     },
     categoryCardSelected: {
       opacity: 0.8,
@@ -179,9 +192,9 @@ const createStyles = (colors: any) =>
       textAlign: 'center',
       color: colors.text,
       fontFamily: colors.fontSemiBold,
+      width: sw(86),
     },
     categoryLabelSelected: {
-      // color: '#FF7B00',
       fontFamily: colors.fontSemiBold,
       fontWeight: '800',
     },

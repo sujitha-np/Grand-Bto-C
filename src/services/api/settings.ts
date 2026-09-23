@@ -11,10 +11,22 @@ export interface PreorderLimitResponse {
 
 export interface WorkingTimeResponse {
   success: boolean;
-  working_time_start: string;
-  working_time_end: string;
+  working_time_start?: string;
+  working_time_end?: string;
   working_time_start_formatted?: string;
   working_time_end_formatted?: string;
+  data?: {
+    working_time_start?: string;
+    working_time_end?: string;
+    working_time_start_formatted?: string;
+    working_time_end_formatted?: string;
+    start_time?: string;
+    end_time?: string;
+    start_time_formatted?: string;
+    end_time_formatted?: string;
+    [key: string]: any;
+  };
+  [key: string]: any;
 }
 
 export const settingsService = {

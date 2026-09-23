@@ -31,11 +31,85 @@ const parseTimeString = (
   defaultHour: number = 7,
   defaultMinute: number = 0,
 ) => {
-  if (!timeStr) return { hour: defaultHour, minute: defaultMinute };
-  const parts = timeStr.split(':').map(p => parseInt(p, 10));
-  const hour = !isNaN(parts[0]) ? parts[0] : defaultHour;
-  const minute = parts.length > 1 && !isNaN(parts[1]) ? parts[1] : defaultMinute;
-  return { hour, minute };
+  if (!timeStr || typeof timeStr !== 'string') {
+    return { hour: defaultHour, minute: defaultMinute };
+  }
+
+  const str = timeStr.trim();
+  const isPM = /pm/i.test(str);
+  const isAM = /am/i.test(str);
+
+  const match = str.match(/(\d{1,2})(?::(\d{2}))?/);
+  if (!match) {
+    return { hour: defaultHour, minute: defaultMinute };
+  }
+
+  let hour = parseInt(match[1], 10);
+  const minute = match[2] !== undefined ? parseInt(match[2], 10) : defaultMinute;
+
+  if (isPM && hour < 12) {
+    hour += 12;
+  } else if (isAM && hour === 12) {
+    hour = 0;
+  }
+
+  return {
+    hour: !isNaN(hour) ? hour : defaultHour,
+    minute: !isNaN(minute) ? minute : defaultMinute,
+  };
+};
+
+const formatTimeStringForDisplay = (timeStr?: string) => {
+  if (!timeStr) return '';
+  const { hour, minute } = parseTimeString(timeStr);
+  const suffix = hour >= 12 && hour < 24 ? 'PM' : 'AM';
+  const display = hour === 0 || hour === 24 ? 12 : hour > 12 ? hour - 12 : hour;
+  return `${display}:${String(minute).padStart(2, '0')} ${suffix}`;
+};
+
+const getWorkingTimeInfo = (data: any) => {
+  if (!data) {
+    return {
+      startStr: undefined,
+      endStr: undefined,
+      startFormatted: undefined,
+      endFormatted: undefined,
+    };
+  }
+
+  const nested = data?.data && typeof data.data === 'object' ? data.data : data;
+
+  const startStr =
+    nested?.working_time_start ||
+    nested?.start_time ||
+    nested?.from_time ||
+    nested?.working_hours_start ||
+    nested?.from ||
+    data?.working_time_start ||
+    data?.start_time;
+
+  const endStr =
+    nested?.working_time_end ||
+    nested?.end_time ||
+    nested?.to_time ||
+    nested?.working_hours_end ||
+    nested?.to ||
+    data?.working_time_end ||
+    data?.end_time;
+
+  const startFormatted =
+    nested?.working_time_start_formatted ||
+    nested?.start_time_formatted ||
+    data?.working_time_start_formatted ||
+    (startStr ? formatTimeStringForDisplay(startStr) : undefined);
+
+  const endFormatted =
+    nested?.working_time_end_formatted ||
+    nested?.end_time_formatted ||
+    data?.working_time_end_formatted ||
+    (endStr ? formatTimeStringForDisplay(endStr) : undefined);
+
+  return { startStr, endStr, startFormatted, endFormatted };
 };
 
 const getValidMinutesForHour = (
@@ -142,27 +216,30 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
     );
   }, [selectedDate]);
 
+  const { startStr, endStr, startFormatted, endFormatted } = useMemo(
+    () => getWorkingTimeInfo(workingTimeData),
+    [workingTimeData],
+  );
+
   const workingHoursDisplay = useMemo(() => {
-    if (
-      workingTimeData?.working_time_start_formatted &&
-      workingTimeData?.working_time_end_formatted
-    ) {
-      return `${workingTimeData.working_time_start_formatted} - ${workingTimeData.working_time_end_formatted}`;
+    if (startFormatted && endFormatted) {
+      return `${startFormatted} - ${endFormatted}`;
     }
     return '';
-  }, [workingTimeData]);
+  }, [startFormatted, endFormatted]);
 
   const baseHours = useMemo(() => {
     const { hour: startHour, minute: startMinute } = parseTimeString(
-      workingTimeData?.working_time_start,
+      startStr,
       7,
       0,
     );
-    const { hour: endHour, minute: endMinute } = parseTimeString(
-      workingTimeData?.working_time_end,
+    const { hour: rawEndHour, minute: endMinute } = parseTimeString(
+      endStr,
       22,
       0,
     );
+    const endHour = rawEndHour === 0 && startHour > 0 ? 24 : rawEndHour;
 
     const hours = [];
     for (let h = startHour; h <= endHour; h++) {
@@ -177,25 +254,26 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
         endMinute,
       );
       if (validMins.length > 0) {
-        const suffix = h < 12 ? 'AM' : 'PM';
-        const display = h === 0 ? 12 : h <= 12 ? h : h - 12;
+        const suffix = h >= 12 && h < 24 ? 'PM' : 'AM';
+        const display = h === 0 || h === 24 ? 12 : h > 12 ? h - 12 : h;
         hours.push({ label: `${display}:00 ${suffix}`, value: h });
       }
     }
     return hours;
-  }, [workingTimeData]);
+  }, [startStr, endStr]);
 
   const availableHours = useMemo(() => {
     const { hour: startHour, minute: startMinute } = parseTimeString(
-      workingTimeData?.working_time_start,
+      startStr,
       7,
       0,
     );
-    const { hour: endHour, minute: endMinute } = parseTimeString(
-      workingTimeData?.working_time_end,
+    const { hour: rawEndHour, minute: endMinute } = parseTimeString(
+      endStr,
       22,
       0,
     );
+    const endHour = rawEndHour === 0 && startHour > 0 ? 24 : rawEndHour;
 
     if (!isSelectedDateToday) {
       return baseHours;
@@ -219,20 +297,21 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
       );
       return validMins.length > 0;
     });
-  }, [baseHours, isSelectedDateToday, workingTimeData]);
+  }, [baseHours, isSelectedDateToday, startStr, endStr]);
 
   const availableMinutes = useMemo(() => {
     if (selectedHour === null) return [];
     const { hour: startHour, minute: startMinute } = parseTimeString(
-      workingTimeData?.working_time_start,
+      startStr,
       7,
       0,
     );
-    const { hour: endHour, minute: endMinute } = parseTimeString(
-      workingTimeData?.working_time_end,
+    const { hour: rawEndHour, minute: endMinute } = parseTimeString(
+      endStr,
       22,
       0,
     );
+    const endHour = rawEndHour === 0 && startHour > 0 ? 24 : rawEndHour;
 
     const now = getQatarDate();
     const curHour = now.getHours();
@@ -248,7 +327,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
       endHour,
       endMinute,
     );
-  }, [selectedHour, isSelectedDateToday, workingTimeData]);
+  }, [selectedHour, isSelectedDateToday, startStr, endStr]);
 
   useEffect(() => {
     if (selectedHour !== null) {
@@ -372,8 +451,8 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
 
   const formatSelectedTime = () => {
     if (selectedHour === null || selectedMinute === null) return '—';
-    const suffix = selectedHour < 12 ? 'AM' : 'PM';
-    const display = selectedHour <= 12 ? selectedHour : selectedHour - 12;
+    const suffix = selectedHour >= 12 && selectedHour < 24 ? 'PM' : 'AM';
+    const display = selectedHour === 0 || selectedHour === 24 ? 12 : selectedHour > 12 ? selectedHour - 12 : selectedHour;
     return `${display}:${String(selectedMinute).padStart(2, '0')} ${suffix}`;
   };
 
@@ -452,9 +531,10 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
   const handleCheckout = () => {
     if (selectedDate && selectedHour !== null && selectedMinute !== null) {
       const pad = (n: number) => String(n).padStart(2, '0');
+      const actualHour = selectedHour === 24 ? 0 : selectedHour;
       const dateStr = `${selectedDate.getFullYear()}-${pad(
         selectedDate.getMonth() + 1,
-      )}-${pad(selectedDate.getDate())} ${pad(selectedHour)}:${pad(
+      )}-${pad(selectedDate.getDate())} ${pad(actualHour)}:${pad(
         selectedMinute,
       )}:00`;
 
@@ -465,7 +545,7 @@ const CalendarScreen: React.FC<CalendarScreenProps> = ({
       }
 
       const deliveryDate = `${selectedDate.getFullYear()}-${pad(selectedDate.getMonth() + 1)}-${pad(selectedDate.getDate())}`;
-      const deliveryTime = `${pad(selectedHour)}:${pad(selectedMinute)}`;
+      const deliveryTime = `${pad(actualHour)}:${pad(selectedMinute)}`;
 
       validateCheckout(
         {

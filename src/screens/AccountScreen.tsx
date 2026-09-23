@@ -31,6 +31,8 @@ interface AccountScreenProps {
   onLoyaltyPoints?: () => void;
   onCoupons?: () => void;
   onResetPassword?: () => void;
+  onAbout?: () => void;
+  onHelp?: () => void;
 }
 
 function AccountScreen({
@@ -42,6 +44,8 @@ function AccountScreen({
   onLoyaltyPoints,
   onCoupons,
   onResetPassword,
+  onAbout,
+  onHelp,
 }: AccountScreenProps) {
   const { t } = useTranslation();
   const colors = useTheme();
@@ -53,9 +57,9 @@ function AccountScreen({
     useCustomerProfile(customerId);
   const profile = profileData?.data;
 
-  // Fetch loyalty points
-  const { data: loyaltyData } = useLoyaltyPoints(customerId);
-  const loyaltyPoints = loyaltyData?.data?.total_loyalty_points || 0;
+  // Fetch loyalty points (Commented out)
+  // const { data: loyaltyData } = useLoyaltyPoints(customerId);
+  // const loyaltyPoints = loyaltyData?.data?.total_loyalty_points || 0;
 
   // Fetch promocodes
   const { data: promocodeData } = usePromocodes();
@@ -86,14 +90,21 @@ function AccountScreen({
     [colors, insets],
   );
 
-  const menuItems = [
+  interface MenuItem {
+    id: string;
+    title: string;
+    icon: any;
+    value?: string;
+  }
+
+  const menuItems: MenuItem[] = [
     { id: '1', title: t('account.accountInfo'), icon: Images.name },
-    {
-      id: '2',
-      title: t('account.loyaltyPoints'),
-      icon: Images.loyality,
-      value: `${loyaltyPoints} ${t('account.points')}`,
-    },
+    // {
+    //   id: '2',
+    //   title: t('account.loyaltyPoints'),
+    //   icon: Images.loyality,
+    //   value: `${loyaltyPoints} ${t('account.points')}`,
+    // },
     { id: '3', title: t('account.coupon'), icon: Images.coupon },
     { id: '4', title: t('account.orderHistory'), icon: Images.orderHistory },
     { id: '5', title: t('account.settings'), icon: Images.settings },
@@ -176,6 +187,7 @@ function AccountScreen({
             </View>
           </TouchableOpacity>
 
+          {/* Loyalty Points Stat Card (Commented out)
           <TouchableOpacity
             style={styles.statCard}
             onPress={() => {
@@ -194,6 +206,7 @@ function AccountScreen({
               </View>
             </View>
           </TouchableOpacity>
+          */}
         </View>
 
         {/* Menu List */}
@@ -206,15 +219,19 @@ function AccountScreen({
                 console.log('Menu item clicked:', item.id, item.title);
                 if (item.id === '1') {
                   onAccountInfo && onAccountInfo();
-                } else if (item.id === '2') {
-                  console.log('Calling onLoyaltyPoints');
-                  onLoyaltyPoints && onLoyaltyPoints();
+                // } else if (item.id === '2') {
+                //   console.log('Calling onLoyaltyPoints');
+                //   onLoyaltyPoints && onLoyaltyPoints();
                 } else if (item.id === '3') {
                   onCoupons && onCoupons();
                 } else if (item.id === '4') {
                   onOrderHistory && onOrderHistory();
                 } else if (item.id === '5') {
                   onSettings && onSettings();
+                } else if (item.id === '6') {
+                  onAbout && onAbout();
+                } else if (item.id === '7') {
+                  onHelp && onHelp();
                 } else if (item.id === '8') {
                   onResetPassword && onResetPassword();
                 }
@@ -319,7 +336,7 @@ const createStyles = (colors: any, insets: any) =>
       flexDirection: 'row',
       paddingHorizontal: sw(20),
       marginTop: -sh(100), // pull cards up into the gradient
-      justifyContent: 'space-between',
+      justifyContent: 'center',
     },
     statCard: {
       backgroundColor: colors.card,
@@ -327,6 +344,7 @@ const createStyles = (colors: any, insets: any) =>
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       paddingVertical: sh(16),
       paddingHorizontal: sw(12),
       marginHorizontal: sw(4),
@@ -342,7 +360,7 @@ const createStyles = (colors: any, insets: any) =>
     statIcon: {
       width: sw(40),
       height: sw(40),
-      marginRight: sw(8),
+      marginRight: sw(12),
     },
     statLabel: {
       fontSize: fs(10),

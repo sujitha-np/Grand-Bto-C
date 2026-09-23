@@ -18,6 +18,8 @@ import { feedbackService } from '../services/api/feedback';
 import { addonsService } from '../services/api/addons';
 import { settingsService } from '../services/api/settings';
 import { notificationService } from '../services/api/notification';
+import { aboutService } from '../services/api/about';
+import { contactService } from '../services/api/contact';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -963,5 +965,23 @@ export const useCancelOrder = () => {
     },
   });
 };
+
+export const useAbout = () => {
+  return useQuery({
+    queryKey: ['about'],
+    queryFn: () => aboutService.getAbout(),
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+export const useContact = () => {
+  return useQuery({
+    queryKey: ['contact'],
+    queryFn: () => contactService.getContact(),
+    staleTime: 10 * 60 * 1000,
+  });
+};
+
+
 
 

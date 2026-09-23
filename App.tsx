@@ -33,7 +33,9 @@ import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import ForgotPasswordScreen from './src/screens/ForgotPasswordScreen';
 import FeedbackScreen from './src/screens/FeedbackScreen';
 import OrderHistoryScreen from './src/screens/OrderHistoryScreen';
-import LoyaltyPointsScreen from './src/screens/LoyaltyPointsScreen';
+import AboutScreen from './src/screens/AboutScreen';
+import HelpScreen from './src/screens/HelpScreen';
+// import LoyaltyPointsScreen from './src/screens/LoyaltyPointsScreen';
 import CartScreen from './src/screens/CartScreen';
 import CalendarScreen from './src/screens/CalendarScreen';
 import SavedAddressScreen from './src/screens/SavedAddressScreen';
@@ -350,7 +352,9 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
         subScreen === 'settings' ||
         subScreen === 'feedback' ||
         subScreen === 'orderHistory' ||
-        subScreen === 'loyaltyPoints' ||
+        subScreen === 'about' ||
+        subScreen === 'help' ||
+        // subScreen === 'loyaltyPoints' ||
         subScreen === 'wishlist' ||
         subScreen === 'cart' ||
         subScreen === 'resetPassword'
@@ -439,10 +443,20 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
     return <OrderHistoryScreen onBack={() => setSubScreen(null)} />;
   }
 
+  if (subScreen === 'about') {
+    return <AboutScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  if (subScreen === 'help') {
+    return <HelpScreen onBack={() => setSubScreen(null)} />;
+  }
+
+  /*
   if (subScreen === 'loyaltyPoints') {
     console.log('Rendering LoyaltyPointsScreen');
     return <LoyaltyPointsScreen onBack={() => setSubScreen(null)} />;
   }
+  */
 
   if (subScreen === 'offeredProducts' && selectedOffer) {
     return (
@@ -704,12 +718,14 @@ function MainApp({ onLogout, customerId }: { onLogout: () => void; customerId: n
             onSettings={() => setSubScreen('settings')}
             onFeedback={() => setSubScreen('feedback')}
             onOrderHistory={() => setSubScreen('orderHistory')}
-            onLoyaltyPoints={() => {
-              console.log('onLoyaltyPoints called in App.tsx');
-              setSubScreen('loyaltyPoints');
-            }}
+            // onLoyaltyPoints={() => {
+            //   console.log('onLoyaltyPoints called in App.tsx');
+            //   setSubScreen('loyaltyPoints');
+            // }}
             onCoupons={() => setSubScreen('coupons')}
             onResetPassword={() => setSubScreen('resetPassword')}
+            onAbout={() => setSubScreen('about')}
+            onHelp={() => setSubScreen('help')}
           />
         )}
       </View>
